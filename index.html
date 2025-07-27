@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard de Respuestas Personalizadas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+    }
+    h1 {
+      color: #333;
+    }
+    label {
+      font-weight: bold;
+    }
+    textarea {
+      width: 100%;
+      max-width: 600px;
+    }
+    .section {
+      margin-top: 1.5rem;
+    }
+    button {
+      margin-top: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+    }
+    a {
+      margin-top: 2rem;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Dashboard de Respuestas Personalizadas</h1>
+  <div class="section">
+    <label for="audioFile">Subir audio (WhatsApp o Telegram):</label><br />
+    <input type="file" id="audioFile" name="file" accept="audio/*" />
+    <button onclick="uploadFile()">Transcribir</button>
+    <input type="hidden" id="filename" name="filename" />
+  </div>
+  <div class="section">
+    <label for="transcription">Transcripción:</label><br />
+    <textarea id="transcription" rows="5" placeholder="El texto de la transcripción aparecerá aquí"></textarea><br />
+    <button onclick="generateResponse()">Generar Respuesta</button>
+  </div>
+  <div class="section">
+    <label for="generated_response">Respuesta generada:</label><br />
+    <textarea id="generated_response" rows="5" placeholder="La respuesta generada aparecerá aquí"></textarea><br />
+  </div>
+  <div class="section">
+    <label for="final_response">Respuesta final (edita para personalizar):</label><br />
+    <textarea id="final_response" rows="5" placeholder="Modifica la respuesta para adaptarla a tu estilo"></textarea><br />
+    <button onclick="saveAll()">Guardar Respuesta</button>
+  </div>
+  <div class="section">
+    <a href="/history">Ver historial de respuestas</a>
+  </div>
+  <script>
+    async function uploadFile() {
+      const fileInput = document.getElementById('audioFile');
+      if (!fileInput.files.length) {
+        alert('Por favor, selecciona un archivo de audio.');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      const response = await fetch('/transcribe', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      document.getElementById('transcription').value = data.transcription;
+      document.getElementById('filename').value = data.filename;
+    }
+    async function generateResponse() {
+      const transcription = document.getElementById('transcription').value;
+      if (!transcription) {
+        alert('Introduce o genera la transcripción antes de solicitar una respuesta.');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('transcription', transcription);
+      const response = await fetch('/generate', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      document.getElementById('generated_response').value = data.generated_response;
+      // Copiar respuesta generada en el campo final para facilitar la edición
+      document.getElementById('final_response').value = data.generated_response;
+    }
+    async function saveAll() {
+      const filename = document.getElementById('filename').value;
+      const transcription = document.getElementById('transcription').value;
+      const generated = document.getElementById('generated_response').value;
+      const finalResp = document.getElementById('final_response').value;
+      if (!transcription || !finalResp) {
+        alert('Necesitas una transcripción y una respuesta final antes de guardar.');
+        return;
+      }
+      const formData = new FormData();
+      if (filename) formData.append('filename', filename);
+      formData.append('transcription', transcription);
+      formData.append('generated_response', generated);
+      formData.append('final_response', finalResp);
+      const response = await fetch('/save', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await response.json();
+      if (data.status === 'saved') {
+        alert('La respuesta se ha guardado correctamente.');
+        // Limpiar campos
+        document.getElementById('transcription').value = '';
+        document.getElementById('generated_response').value = '';
+        document.getElementById('final_response').value = '';
+        document.getElementById('audioFile').value = '';
+      } else {
+        alert('Ocurrió un error al guardar.');
+      }
+    }
+  </script>
+</body>
+</html>

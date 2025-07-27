@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elite Athletes • History</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            /* Brand Colors */
+            --primary-500: #6366f1;
+            --primary-600: #4f46e5;
+            --primary-700: #4338ca;
+            --secondary-500: #8b5cf6;
+            --secondary-600: #7c3aed;
+            
+            /* Semantic Colors */
+            --success-50: #ecfdf5;
+            --success-500: #10b981;
+            --success-600: #059669;
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            --warning-600: #d97706;
+            --error-50: #fef2f2;
+            --error-500: #ef4444;
+            --error-600: #dc2626;
+            --info-50: #eff6ff;
+            --info-500: #3b82f6;
+            --info-600: #2563eb;
+            
+            /* Neutral Colors */
+            --gray-50: #f8fafc;
+            --gray-100: #f1f5f9;
+            --gray-200: #e2e8f0;
+            --gray-300: #cbd5e1;
+            --gray-400: #94a3b8;
+            --gray-500: #64748b;
+            --gray-600: #475569;
+            --gray-700: #334155;
+            --gray-800: #1e293b;
+            --gray-900: #0f172a;
+            
+            /* Dark Theme */
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f2937;
+            --bg-surface: #374151;
+            --bg-overlay: rgba(17, 24, 39, 0.8);
+            
+            /* Text Colors */
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-tertiary: #9ca3af;
+            --text-quaternary: #6b7280;
+            
+            /* Borders */
+            --border-primary: #374151;
+            --border-secondary: #4b5563;
+            --border-focus: var(--primary-500);
+            
+            /* Shadows */
+            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            
+            /* Spacing */
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-5: 1.25rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-10: 2.5rem;
+            --space-12: 3rem;
+            --space-16: 4rem;
+            
+            /* Border Radius */
+            --radius-sm: 0.25rem;
+            --radius-md: 0.375rem;
+            --radius-lg: 0.5rem;
+            --radius-xl: 0.75rem;
+            --radius-2xl: 1rem;
+            --radius-3xl: 1.5rem;
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-feature-settings: 'cv11', 'ss01';
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-primary);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.875rem;
+        }
+
+        .nav-section {
+            padding: var(--space-4) var(--space-6);
+        }
+
+        .nav-section-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-quaternary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-3);
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            margin-bottom: var(--space-1);
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-4);
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: var(--radius-lg);
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            position: relative;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 16px;
+            background: white;
+            border-radius: 2px;
+        }
+
+        .nav-badge {
+            background: var(--primary-500);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            min-width: 1.25rem;
+            text-align: center;
+            margin-left: auto;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
+            padding: var(--space-4) var(--space-6);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: var(--space-4);
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 0.875rem;
+            color: var(--text-tertiary);
+        }
+
+        .breadcrumb-separator {
+            color: var(--text-quaternary);
+        }
+
+        .search-bar {
+            position: relative;
+            max-width: 400px;
+            flex: 1;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: var(--space-3) var(--space-4) var(--space-3) var(--space-10);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all var(--transition-fast);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: var(--space-3);
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-quaternary);
+            font-size: 0.875rem;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-lg);
+            border: none;
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .btn-icon:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-2);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .user-menu:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        /* Content Area */
+        .content-area {
+            padding: var(--space-6);
+        }
+
+        .page-header {
+            margin-bottom: var(--space-8);
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--space-2);
+        }
+
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .athlete-details {
+            color: var(--text-tertiary);
+            margin-top: var(--space-2);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: var(--space-4);
+            margin-top: var(--space-4);
+        }
+
+        /* Card Component */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-2xl);
+            overflow: hidden;
+            transition: all var(--transition-base);
+            margin-bottom: var(--space-6);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* Filters */
+        .filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--space-4);
+            margin-bottom: var(--space-6);
+            padding: var(--space-6);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-2xl);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-2);
+        }
+
+        .filter-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .filter-select, .filter-input {
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all var(--transition-fast);
+        }
+
+        .filter-select:focus, .filter-input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .filter-select {
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+
+        .filter-input::placeholder {
+            color: var(--text-quaternary);
+        }
+
+        /* History Table */
+        .history-table {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-2xl);
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 80px 120px 1fr 2fr 100px 100px;
+            gap: var(--space-4);
+            padding: var(--space-4) var(--space-6);
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-primary);
+            font-size: 0.875rem;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 80px 120px 1fr 2fr 100px 100px;
+            gap: var(--space-4);
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+            transition: all var(--transition-fast);
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .table-row:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .table-row:last-child {
+            border-bottom: none;
+        }
+
+        .table-cell {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .table-cell.athlete-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .table-cell.priority {
+            padding: var(--space-1) var(--space-3);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .priority-high {
+            background: var(--error-50);
+            color: var(--error-600);
+        }
+
+        .priority-medium {
+            background: var(--warning-50);
+            color: var(--warning-600);
+        }
+
+        .priority-low {
+            background: var(--success-50);
+            color: var(--success-600);
+        }
+
+        .priority-urgent {
+            background: var(--error-500);
+            color: white;
+        }
+
+        /* Source Indicators */
+        .source-whatsapp {
+            color: var(--success-600);
+        }
+
+        .source-telegram {
+            color: var(--info-600);
+        }
+
+        .source-manual {
+            color: var(--text-secondary);
+        }
+
+        .source-whatsapp i {
+            color: #25d366;
+        }
+
+        .source-telegram i {
+            color: #0088cc;
+        }
+
+        .source-manual i {
+            color: var(--text-quaternary);
+        }
+
+        .table-cell.category {
+            padding: var(--space-1) var(--space-3);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary-500);
+        }
+
+        /* Button Components */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-2);
+            padding: var(--space-3) var(--space-5);
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-600);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid transparent;
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border-color: var(--border-primary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-16) var(--space-8);
+            color: var(--text-tertiary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-2xl);
+            margin-top: var(--space-6);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: var(--space-4);
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-2);
+        }
+
+        .empty-state p {
+            margin-bottom: var(--space-6);
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            top: var(--space-6);
+            right: var(--space-6);
+            max-width: 400px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-4);
+            box-shadow: var(--shadow-2xl);
+            z-index: 70;
+            transform: translateX(120%);
+            transition: all var(--transition-base);
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-content {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-3);
+        }
+
+        .toast-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .toast-icon.success {
+            background: var(--success-500);
+            color: white;
+        }
+
+        .toast-icon.error {
+            background: var(--error-500);
+            color: white;
+        }
+
+        .toast-icon.info {
+            background: var(--info-500);
+            color: white;
+        }
+
+        .toast-body {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-1);
+        }
+
+        .toast-description {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Utility Classes */
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .filters {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform var(--transition-base);
+            }
+            
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .top-bar {
+                padding: var(--space-4);
+            }
+            
+            .search-bar {
+                display: none;
+            }
+            
+            .content-area {
+                padding: var(--space-4);
+            }
+            
+            .filters {
+                grid-template-columns: 1fr;
+            }
+            
+            .table-header {
+                display: none;
+            }
+            
+            .table-row {
+                grid-template-columns: 1fr;
+                gap: var(--space-2);
+                padding: var(--space-4);
+                border: 1px solid var(--border-primary);
+                border-radius: var(--radius-lg);
+                margin-bottom: var(--space-4);
+                background: var(--bg-secondary);
+            }
+            
+            .table-cell {
+                white-space: normal;
+            }
+            
+            .page-title {
+                font-size: 1.5rem;
+            }
+            
+            .header-actions {
+                flex-direction: column;
+                gap: var(--space-2);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-dumbbell"></i>
+                </div>
+                <span>Elite Athletes</span>
+            </div>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Main</div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/dashboard" class="nav-link">
+                        <i class="fas fa-chart-line"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/athletes/manage" class="nav-link">
+                        <i class="fas fa-users"></i>
+                        Athletes
+                        <span class="nav-badge" id="athleteCount">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/history" class="nav-link active">
+                        <i class="fas fa-history"></i>
+                        History
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Tools</div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/dashboard" class="nav-link">
+                        <i class="fas fa-microphone"></i>
+                        Audio Processing
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-chart-bar"></i>
+                        Analytics
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-file-alt"></i>
+                        Reports
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="nav-section">
+            <div class="nav-section-title">Settings</div>
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-plug"></i>
+                        Integrations
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" class="nav-link">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="breadcrumb">
+                <span>Dashboard</span>
+                <span class="breadcrumb-separator">/</span>
+                {% if athlete %}
+                <span>Athletes</span>
+                <span class="breadcrumb-separator">/</span>
+                <span>{{ athlete.name }} History</span>
+                {% else %}
+                <span>History</span>
+                {% endif %}
+            </div>
+            
+            <div class="search-bar">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" placeholder="Search conversations..." id="searchFilter" oninput="filterHistory()">
+            </div>
+            
+            <div class="top-bar-actions">
+                <button class="btn-icon" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                </button>
+                <button class="btn-icon" title="Help">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+                <div class="user-menu">
+                    <div class="user-avatar">EA</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            <!-- Page Header -->
+            <div class="page-header">
+                {% if athlete %}
+                <div>
+                    <h1 class="page-title">{{ athlete.name }} - History</h1>
+                    <p class="athlete-details">
+                        <i class="fas fa-user"></i> {{ athlete.sport }} • {{ athlete.level }}
+                        {% if athlete.email %} • {{ athlete.email }}{% endif %}
+                    </p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="window.location.href='/athletes/manage'">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Athletes
+                    </button>
+                    <button class="btn btn-ghost" onclick="window.location.href='/history'">
+                        <i class="fas fa-history"></i>
+                        All History
+                    </button>
+                </div>
+                {% else %}
+                <div>
+                    <h1 class="page-title">Conversation History</h1>
+                    <p class="page-subtitle">View and manage all athlete conversations and interactions</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="window.location.href='/dashboard'">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Dashboard
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Filters -->
+            <div class="filters animate-fade-in">
+                {% if not athlete %}
+                <div class="filter-group">
+                    <label class="filter-label">Filter by Athlete</label>
+                    <select class="filter-select" id="athleteFilter" onchange="filterHistory()">
+                        <option value="">All Athletes</option>
+                    </select>
+                </div>
+                {% endif %}
+                <div class="filter-group">
+                    <label class="filter-label">Category</label>
+                    <select class="filter-select" id="categoryFilter" onchange="filterHistory()">
+                        <option value="">All Categories</option>
+                        <option value="training">Training</option>
+                        <option value="nutrition">Nutrition</option>
+                        <option value="recovery">Recovery</option>
+                        <option value="competition">Competition</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Priority</label>
+                    <select class="filter-select" id="priorityFilter" onchange="filterHistory()">
+                        <option value="">All Priorities</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Date Range</label>
+                    <input type="date" class="filter-input" id="dateFilter" onchange="filterHistory()">
+                </div>
+                <div class="filter-group">
+                    <label class="filter-label">Source</label>
+                    <select class="filter-select" id="sourceFilter" onchange="filterHistory()">
+                        <option value="">All Sources</option>
+                        <option value="manual">Manual</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="telegram">Telegram</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- History Table -->
+            <div class="history-table animate-fade-in">
+                <div class="table-header">
+                    <div>ID</div>
+                    <div>Date</div>
+                    <div>Athlete</div>
+                    <div>Transcription</div>
+                    <div>Category</div>
+                    <div>Priority</div>
+                    <div>Source</div>
+                </div>
+                <div id="historyContent">
+                    <!-- History will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state animate-fade-in" id="emptyState" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No conversations found</h3>
+                <p>Start by creating your first athlete and processing some audio messages.</p>
+                <button class="btn btn-primary" onclick="window.location.href='/dashboard'">
+                    <i class="fas fa-plus"></i>
+                    Start Now
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <div class="toast-content">
+            <div class="toast-icon" id="toastIcon">
+                <i class="fas fa-check"></i>
+            </div>
+            <div class="toast-body">
+                <div class="toast-title" id="toastTitle">Success</div>
+                <div class="toast-description" id="toastDescription">Operation completed successfully</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allHistory = [];
+        let athletes = [];
+        let filteredHistory = [];
+
+        async function loadData() {
+            try {
+                // Load athletes
+                const athletesResponse = await fetch('/athletes');
+                const athletesData = await athletesResponse.json();
+                athletes = athletesData.athletes;
+                updateAthleteCount();
+                populateAthleteFilter();
+
+                // Load history
+                const historyResponse = await fetch('/history-data');
+                const historyData = await historyResponse.json();
+                allHistory = historyData.history || [];
+                filteredHistory = [...allHistory];
+                renderHistory();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                loadLegacyHistory();
+            }
+        }
+
+        function updateAthleteCount() {
+            const badge = document.getElementById('athleteCount');
+            if (badge) {
+                badge.textContent = athletes.length;
+            }
+        }
+
+        async function loadLegacyHistory() {
+            // Fallback for old history format
+            try {
+                const response = await fetch('/history');
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const rows = doc.querySelectorAll('tbody tr');
+                
+                allHistory = Array.from(rows).map(row => {
+                    const cells = row.querySelectorAll('td');
+                    return {
+                        id: cells[0]?.textContent || '',
+                        timestamp: cells[1]?.textContent || '',
+                        athlete_name: 'Unknown',
+                        transcription: cells[2]?.textContent || '',
+                        final_response: cells[3]?.textContent || '',
+                        category: 'general',
+                        priority: 'medium'
+                    };
+                });
+                
+                filteredHistory = [...allHistory];
+                renderHistory();
+            } catch (error) {
+                console.error('Error loading legacy history:', error);
+            }
+        }
+
+        function populateAthleteFilter() {
+            const select = document.getElementById('athleteFilter');
+            if (select) {
+                athletes.forEach(athlete => {
+                    const option = document.createElement('option');
+                    option.value = athlete.id;
+                    option.textContent = athlete.name;
+                    select.appendChild(option);
+                });
+            }
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('historyContent');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (filteredHistory.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            container.innerHTML = '';
+            
+            filteredHistory.forEach(record => {
+                const row = createHistoryRow(record);
+                container.appendChild(row);
+            });
+        }
+
+        function createHistoryRow(record) {
+            const row = document.createElement('div');
+            row.className = 'table-row';
+            
+            const athlete = athletes.find(a => a.id === record.athlete_id) || { name: 'Unknown' };
+            
+            const sourceIcon = getSourceIcon(record.source);
+            const sourceLabel = getSourceLabel(record.source);
+            
+            row.innerHTML = `
+                <div class="table-cell">#${record.id}</div>
+                <div class="table-cell">${new Date(record.timestamp).toLocaleDateString()}</div>
+                <div class="table-cell athlete-name">${athlete.name}</div>
+                <div class="table-cell" title="${record.transcription}">${record.transcription.substring(0, 100)}${record.transcription.length > 100 ? '...' : ''}</div>
+                <div class="table-cell category">${record.category || 'general'}</div>
+                <div class="table-cell priority priority-${record.priority || 'medium'}">${record.priority || 'medium'}</div>
+                <div class="table-cell source-${record.source || 'manual'}" title="${sourceLabel}">
+                    <i class="${sourceIcon}"></i>
+                    <span>${sourceLabel}</span>
+                </div>
+            `;
+            
+            row.onclick = () => viewConversation(record.id);
+            
+            return row;
+        }
+
+        function getSourceIcon(source) {
+            switch (source) {
+                case 'whatsapp':
+                    return 'fab fa-whatsapp';
+                case 'telegram':
+                    return 'fab fa-telegram-plane';
+                case 'manual':
+                default:
+                    return 'fas fa-edit';
+            }
+        }
+
+        function getSourceLabel(source) {
+            switch (source) {
+                case 'whatsapp':
+                    return 'WhatsApp';
+                case 'telegram':
+                    return 'Telegram';
+                case 'manual':
+                default:
+                    return 'Manual';
+            }
+        }
+
+        function filterHistory() {
+            const athleteFilter = document.getElementById('athleteFilter')?.value || '';
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const priorityFilter = document.getElementById('priorityFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            const dateFilter = document.getElementById('dateFilter').value;
+            const sourceFilter = document.getElementById('sourceFilter').value;
+            
+            filteredHistory = allHistory.filter(record => {
+                const athlete = athletes.find(a => a.id === record.athlete_id) || { name: 'Unknown' };
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                
+                return (!athleteFilter || record.athlete_id === parseInt(athleteFilter)) &&
+                       (!categoryFilter || record.category === categoryFilter) &&
+                       (!priorityFilter || record.priority === priorityFilter) &&
+                       (!dateFilter || recordDate === dateFilter) &&
+                       (!sourceFilter || (record.source || 'manual') === sourceFilter) &&
+                       (!searchFilter || 
+                        record.transcription.toLowerCase().includes(searchFilter) ||
+                        record.final_response.toLowerCase().includes(searchFilter) ||
+                        athlete.name.toLowerCase().includes(searchFilter));
+            });
+            
+            renderHistory();
+        }
+
+        function viewConversation(id) {
+            // TODO: Implement detailed view
+            showToast(`Viewing conversation #${id} - Feature coming soon`, 'info');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toastIcon');
+            const title = document.getElementById('toastTitle');
+            const description = document.getElementById('toastDescription');
+            
+            // Update content
+            title.textContent = type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Info';
+            description.textContent = message;
+            
+            // Update styling
+            icon.className = `toast-icon ${type}`;
+            if (type === 'success') {
+                icon.innerHTML = '<i class="fas fa-check"></i>';
+            } else if (type === 'error') {
+                icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            } else {
+                icon.innerHTML = '<i class="fas fa-info-circle"></i>';
+            }
+            
+            // Show toast
+            toast.classList.add('show');
+            
+            // Hide after 4 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+
+        // Add endpoint for history data
+        if (!window.location.pathname.includes('/history-data')) {
+            // Create a new endpoint for JSON data
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                if (args[0] === '/history-data') {
+                    return originalFetch('/history').then(response => {
+                        return response.text().then(html => {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            const rows = doc.querySelectorAll('tbody tr');
+                            
+                            const history = Array.from(rows).map(row => {
+                                const cells = row.querySelectorAll('td');
+                                return {
+                                    id: parseInt(cells[0]?.textContent || '0'),
+                                    timestamp: cells[1]?.textContent || '',
+                                    transcription: cells[2]?.textContent || '',
+                                    final_response: cells[3]?.textContent || '',
+                                    category: 'general',
+                                    priority: 'medium',
+                                    athlete_id: null
+                                };
+                            });
+                            
+                            return {
+                                ok: true,
+                                json: () => Promise.resolve({ history })
+                            };
+                        });
+                    });
+                }
+                return originalFetch(...args);
+            };
+        }
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

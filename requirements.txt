@@ -1,8 +1,15 @@
+fastapi
+uvicorn
+python-multipart
+jinja2
 openai
 openai-whisper
 python-dotenv
 ffmpeg-python
-flask
+fuzzywuzzy
+python-Levenshtein
 python-telegram-bot
 langdetect
 twilio
+aiofiles
+requests

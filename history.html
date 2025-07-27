@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Historial de Respuestas</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 800px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    h1 {
+      color: #333;
+    }
+    a {
+      margin-top: 1rem;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Historial de Respuestas Guardadas</h1>
+  {% if records %}
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Fecha</th>
+        <th>Transcripción</th>
+        <th>Respuesta Final</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rec in records %}
+      <tr>
+        <td>{{ rec[0] }}</td>
+        <td>{{ rec[1] }}</td>
+        <td>{{ rec[2][:50] }}{% if rec[2]|length > 50 %}…{% endif %}</td>
+        <td>{{ rec[3][:50] }}{% if rec[3]|length > 50 %}…{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p>No hay registros guardados todavía.</p>
+  {% endif %}
+  <a href="/">Volver al dashboard</a>
+</body>
+</html>
