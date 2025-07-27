@@ -1,0 +1,8 @@
+openai
+openai-whisper
+python-dotenv
+ffmpeg-python
+flask
+python-telegram-bot
+langdetect
+twilio
