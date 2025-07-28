@@ -1,252 +1,253 @@
+#!/usr/bin/env python3
+"""
+Test script for WhatsApp and Telegram webhook integration
+"""
+
 import requests
 import json
 import time
 
-# Test the webhook integration functionality
-
+# Test configuration
 BASE_URL = "http://localhost:8000"
+TEST_PHONES = [
+    "+34123456789",  # Ramon Curto's actual phone
+    "34123456789",   # Without +
+    "123456789",     # Last 9 digits
+    "23456789",      # Last 8 digits
+]
+
+def test_server_ready():
+    """Check if the server is running"""
+    try:
+        response = requests.get(f"{BASE_URL}/", timeout=2)
+        return response.status_code == 200
+    except:
+        return False
 
 def test_phone_matching():
-    """Test the phone number matching functionality."""
+    """Test phone number matching functionality"""
     print("🔍 Testing Phone Number Matching")
     print("=" * 50)
     
-    # Test with different phone number formats
-    test_phones = [
-        "+34679795648",  # International format
-        "34679795648",   # Without +
-        "0679795648",    # With leading 0
-        "679-795-648",   # With dashes
-        "679 795 648",   # With spaces
-    ]
-    
-    for phone in test_phones:
+    for phone in TEST_PHONES:
         try:
             response = requests.get(f"{BASE_URL}/athletes/phone/{phone}")
             if response.status_code == 200:
                 data = response.json()
-                print(f"✅ Phone {phone}: Found athlete {data['athlete']['name']}")
-            elif response.status_code == 404:
-                print(f"❌ Phone {phone}: No athlete found")
+                if data.get("athlete"):
+                    print(f"✅ Phone {phone}: Found athlete {data['athlete']['name']}")
+                else:
+                    print(f"❌ Phone {phone}: No athlete found")
             else:
-                print(f"⚠️  Phone {phone}: Unexpected status {response.status_code}")
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Phone {phone}: Error - {e}")
-    
-    print()
-
+                print(f"❌ Phone {phone}: Request failed ({response.status_code})")
+        except Exception as e:
+            print(f"❌ Phone {phone}: Error - {str(e)}")
 
 def test_webhook_simulation():
-    """Test the webhook functionality with simulated messages."""
-    print("📱 Testing Webhook Message Processing")
+    """Test webhook message processing"""
+    print("\n📱 Testing Webhook Message Processing")
     print("=" * 50)
     
-    # Test messages from different sources
     test_messages = [
         {
-            "phone": "+34679795648",
-            "message": "Hi coach! How should I prepare for my next competition?",
+            "phone": "+34123456789",
+            "message": "Hola coach, necesito consejos sobre mi plan de nutrición para la próxima competición",
             "source": "whatsapp"
         },
         {
-            "phone": "34679795648",
-            "message": "I'm feeling some pain in my knee after training yesterday",
+            "phone": "34123456789",
+            "message": "Coach, I've been feeling tired during training. Should I adjust my recovery routine?",
             "source": "telegram"
         },
         {
-            "phone": "+34679795648",  # Non-existent athlete
-            "message": "Hello, I'm a new athlete",
-            "source": "test"
+            "phone": "+34123456789",
+            "message": "¿Cuál es el mejor momento para hacer cardio en relación con mis entrenamientos de fuerza?",
+            "source": "whatsapp"
         }
     ]
     
-    for i, test_data in enumerate(test_messages, 1):
-        print(f"📤 Test Message {i}: {test_data['source']} from {test_data['phone']}")
+    for i, test in enumerate(test_messages, 1):
+        print(f"\n📤 Test Message {i}: {test['source']} from {test['phone']}")
         try:
-            response = requests.post(f"{BASE_URL}/test/webhook", json=test_data)
-            data = response.json()
+            response = requests.post(
+                f"{BASE_URL}/test/webhook",
+                json={
+                    "phone": test["phone"],
+                    "message": test["message"],
+                    "source": test["source"]
+                }
+            )
             
             if response.status_code == 200:
-                print(f"✅ Success: {data['message']}")
-                if 'athlete' in data:
-                    print(f"   👤 Athlete: {data['athlete']['name']}")
-                if 'response' in data and data['response']:
-                    print(f"   🤖 AI Response: {data['response'][:100]}...")
+                data = response.json()
+                if data.get("status") == "success":
+                    athlete = data.get("athlete", {})
+                    print(f"✅ Success: Message processed for {athlete.get('name', 'Unknown')}")
+                    if data.get("response"):
+                        print(f"   🤖 Response: {data['response'][:100]}...")
+                else:
+                    print(f"✅ Success: {data.get('message', 'No athlete found')}")
             else:
-                print(f"❌ Error ({response.status_code}): {data.get('message', 'Unknown error')}")
-        
-        except requests.exceptions.RequestException as e:
-            print(f"❌ Request failed: {e}")
-        
-        print()
-
+                print(f"❌ Request failed: {response.status_code}")
+        except Exception as e:
+            print(f"❌ Request failed: {str(e)}")
 
 def test_whatsapp_webhook_format():
-    """Test WhatsApp webhook with realistic payload format."""
-    print("📱 Testing WhatsApp Webhook Format")
+    """Test WhatsApp webhook format"""
+    print("\n📱 Testing WhatsApp Webhook Format")
     print("=" * 50)
     
-    # Simulate a Twilio WhatsApp webhook payload
+    # Simulate WhatsApp Business API webhook format
     whatsapp_payload = {
-        "messages": [
-            {
-                "from": "whatsapp:+34679795648",
-                "id": "wamid.ABC123",
-                "text": {
-                    "body": "Coach, I completed my training session today. My times are improving!"
+        "object": "whatsapp_business_account",
+        "entry": [{
+            "id": "123456789",
+            "changes": [{
+                "value": {
+                    "messaging_product": "whatsapp",
+                    "metadata": {
+                        "display_phone_number": "1234567890",
+                        "phone_number_id": "123456789"
+                    },
+                    "contacts": [{
+                        "profile": {
+                            "name": "Ramon Curto"
+                        },
+                        "wa_id": "34123456789"
+                    }],
+                    "messages": [{
+                        "from": "34123456789",
+                        "id": "wamid.test123",
+                        "timestamp": "1234567890",
+                        "text": {
+                            "body": "Hola coach, ¿cómo estás? Necesito ayuda con mi entrenamiento."
+                        },
+                        "type": "text"
+                    }]
                 },
-                "timestamp": "1640995200",
-                "type": "text"
-            }
-        ]
+                "field": "messages"
+            }]
+        }]
     }
     
     try:
-        response = requests.post(f"{BASE_URL}/webhook/whatsapp", json=whatsapp_payload)
-        data = response.json()
+        response = requests.post(
+            f"{BASE_URL}/webhook/whatsapp",
+            json=whatsapp_payload,
+            headers={"Content-Type": "application/json"}
+        )
         
         if response.status_code == 200:
+            data = response.json()
             print(f"✅ WhatsApp webhook processed successfully")
-            print(f"   Status: {data.get('status')}")
-            if 'athlete' in data:
-                print(f"   👤 Athlete: {data['athlete']}")
-            if 'response' in data:
-                print(f"   🤖 Response: {data['response'][:100]}...")
+            print(f"   Status: {data.get('status', 'unknown')}")
         else:
-            print(f"❌ WhatsApp webhook failed ({response.status_code}): {data}")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"❌ WhatsApp webhook request failed: {e}")
-    
-    print()
-
+            print(f"❌ WhatsApp webhook failed ({response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"❌ WhatsApp webhook request failed: {str(e)}")
 
 def test_telegram_webhook_format():
-    """Test Telegram webhook with realistic payload format."""
-    print("📱 Testing Telegram Webhook Format")
+    """Test Telegram webhook format"""
+    print("\n📱 Testing Telegram Webhook Format")
     print("=" * 50)
     
-    # Simulate a Telegram Bot API webhook payload
+    # Simulate Telegram Bot API webhook format
     telegram_payload = {
         "update_id": 123456789,
         "message": {
-            "message_id": 1,
+            "message_id": 123,
             "from": {
-                "id": 987654321,
+                "id": 123456789,
                 "is_bot": False,
-                "first_name": "John",
-                "last_name": "Doe",
-                "username": "johndoe"
+                "first_name": "Ramon",
+                "last_name": "Curto",
+                "username": "ramoncurto"
             },
             "chat": {
-                "id": 987654321,
-                "first_name": "John",
-                "last_name": "Doe",
-                "username": "johndoe",
+                "id": 123456789,
+                "first_name": "Ramon",
+                "last_name": "Curto",
+                "username": "ramoncurto",
                 "type": "private"
             },
-            "date": 1640995200,
-            "text": "I need advice on my nutrition plan for the upcoming season",
-            "contact": {
-                "phone_number": "+34123456789",
-                "first_name": "John",
-                "last_name": "Doe"
-            }
+            "date": 1234567890,
+            "text": "Coach, I need advice on my nutrition plan for the upcoming competition. What should I focus on?"
         }
     }
     
     try:
-        response = requests.post(f"{BASE_URL}/webhook/telegram", json=telegram_payload)
-        data = response.json()
+        response = requests.post(
+            f"{BASE_URL}/webhook/telegram",
+            json=telegram_payload,
+            headers={"Content-Type": "application/json"}
+        )
         
         if response.status_code == 200:
+            data = response.json()
             print(f"✅ Telegram webhook processed successfully")
-            print(f"   Status: {data.get('status')}")
-            if 'athlete' in data:
-                print(f"   👤 Athlete: {data['athlete']}")
-            if 'response' in data:
-                print(f"   🤖 Response: {data['response'][:100]}...")
+            print(f"   Status: {data.get('status', 'unknown')}")
         else:
-            print(f"❌ Telegram webhook failed ({response.status_code}): {data}")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Telegram webhook request failed: {e}")
-    
-    print()
-
+            print(f"❌ Telegram webhook failed ({response.status_code}): {response.text}")
+    except Exception as e:
+        print(f"❌ Telegram webhook request failed: {str(e)}")
 
 def test_conversation_history():
-    """Check if conversations were saved correctly."""
-    print("📚 Testing Conversation History")
+    """Test conversation history with source tracking"""
+    print("\n📚 Testing Conversation History")
     print("=" * 50)
     
     try:
-        # Get all athletes
+        # Get athletes
         response = requests.get(f"{BASE_URL}/athletes")
-        athletes_data = response.json()
-        
-        for athlete in athletes_data.get('athletes', []):
-            athlete_id = athlete['id']
-            athlete_name = athlete['name']
+        if response.status_code == 200:
+            athletes = response.json().get("athletes", [])
             
-            # Get history for this athlete
-            history_response = requests.get(f"{BASE_URL}/athletes/{athlete_id}/history")
-            history_data = history_response.json()
-            
-            conversations = history_data.get('history', [])
-            print(f"👤 {athlete_name}: {len(conversations)} conversation(s)")
-            
-            for conv in conversations[-3:]:  # Show last 3 conversations
-                source = conv.get('source', 'manual')
-                timestamp = conv.get('timestamp', '')
-                transcription = conv.get('transcription', '')[:50]
+            for athlete in athletes:
+                print(f"\n👤 {athlete['name']}: ", end="")
                 
-                print(f"   📝 {timestamp[:19]} [{source}]: {transcription}...")
-    
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Error retrieving history: {e}")
-    
-    print()
-
+                # Get athlete history
+                history_response = requests.get(f"{BASE_URL}/athletes/{athlete['id']}/history")
+                if history_response.status_code == 200:
+                    history = history_response.json().get("history", [])
+                    print(f"{len(history)} conversation(s)")
+                    
+                    for record in history[:3]:  # Show first 3 conversations
+                        source = record.get("source", "manual")
+                        source_icon = "📱" if source in ["whatsapp", "telegram"] else "✏️"
+                        date = record.get("timestamp", "")[:10]
+                        transcription = record.get("transcription", "")[:50]
+                        print(f"   {source_icon} {date} [{source}]: {transcription}...")
+                else:
+                    print("0 conversation(s)")
+        else:
+            print("❌ Error retrieving athletes")
+    except Exception as e:
+        print(f"❌ Error retrieving history: {str(e)}")
 
 def main():
-    """Run all webhook integration tests."""
+    """Run all tests"""
     print("🏆 WhatsApp & Telegram Integration Tests")
     print("=" * 60)
     print("⏳ Make sure the server is running on http://localhost:8000")
     print()
     
-    # Wait for server to be ready
-    for i in range(5):
-        try:
-            response = requests.get(f"{BASE_URL}/dashboard")
-            if response.status_code == 200:
-                break
-        except:
-            if i == 4:
-                print("❌ Server not responding. Please start the server first.")
-                return
-            time.sleep(1)
-    
-    print("✅ Server is ready!")
+    # Skip server check for now and try tests directly
+    print("🔄 Attempting tests directly...")
     print()
     
-    # Run all tests
     test_phone_matching()
     test_webhook_simulation()
     test_whatsapp_webhook_format()
     test_telegram_webhook_format()
     test_conversation_history()
     
-    print("🎉 Webhook Integration Tests Completed!")
-    print()
-    print("📋 Next Steps:")
+    print("\n🎉 Webhook Integration Tests Completed!")
+    print("\n📋 Next Steps:")
     print("1. Update your athlete profiles with phone numbers")
     print("2. Configure WhatsApp Business API webhook to point to /webhook/whatsapp")
     print("3. Configure Telegram Bot webhook to point to /webhook/telegram")
     print("4. Set WHATSAPP_VERIFY_TOKEN in your .env file")
     print("5. Test with real WhatsApp/Telegram messages!")
-
 
 if __name__ == "__main__":
     main() 

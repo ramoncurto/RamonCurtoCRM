@@ -277,8 +277,8 @@ async def transcribe(file: UploadFile = File(...)) -> JSONResponse:
             
         logger.info(f"File saved successfully: {file_path} ({file_size} bytes)")
         
-        # Use Whisper for actual transcription
-        transcription = transcription_service.transcribe_audio(file_path)
+        # Use OpenAI Whisper API for actual transcription
+        transcription = await transcription_service.transcribe_audio(file_path)
         
         if transcription is None:
             transcription = (

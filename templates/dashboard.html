@@ -471,7 +471,7 @@
                 });
                 
                 const data = await response.json();
-                document.getElementById('generated_response').value = data.generated_response;
+                // Only set the final_response since generated_response element doesn't exist
                 document.getElementById('final_response').value = data.generated_response;
                 updateButtonStates();
                 
@@ -496,7 +496,8 @@
                 const formData = new FormData();
                 formData.append('athlete_id', selectedAthlete);
                 formData.append('transcription', document.getElementById('transcription').value);
-                formData.append('generated_response', document.getElementById('generated_response').value);
+                // Use the final_response as both generated and final since we don't have a separate generated_response field
+                formData.append('generated_response', document.getElementById('final_response').value);
                 formData.append('final_response', document.getElementById('final_response').value);
                 formData.append('category', document.getElementById('category').value);
                 formData.append('priority', 'medium');
@@ -512,7 +513,6 @@
                     // Reset form
                     document.getElementById('audioFile').value = '';
                     document.getElementById('transcription').value = '';
-                    document.getElementById('generated_response').value = '';
                     document.getElementById('final_response').value = '';
                     updateButtonStates();
                 }
