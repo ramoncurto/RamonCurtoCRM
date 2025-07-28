@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Elite Athletes CRM{% endblock %}</title>
+    <!-- Main design system stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-Vy45egK6BeS1PGO5ik9zGvnAa7Hz9i0RDo9gRgKkFrk9YVmoMPeW4kW2GszZxLIjPDQiHj6Aq6A4gkgK1q1fXA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    {% block extra_css %}{% endblock %}
+    <style>
+        /* Basic navigation styling for the improved layout */
+        .sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+            padding-top: var(--space-6);
+        }
+        .sidebar-logo {
+            margin-bottom: var(--space-8);
+            text-align: center;
+            font-size: var(--font-size-xl);
+            font-weight: var(--font-bold);
+        }
+        .nav {
+            display: flex;
+            flex-direction: column;
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-3) var(--space-6);
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: var(--font-size-sm);
+            transition: background var(--transition-fast);
+        }
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        .nav-item.active {
+            background: var(--primary-600);
+            color: white;
+        }
+        .nav-item .badge {
+            margin-left: auto;
+            background: var(--primary-500);
+            color: white;
+            padding: 0 var(--space-2);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+        }
+        .main-content {
+            flex: 1;
+            padding: var(--space-6);
+            overflow: hidden;
+        }
+        .page-header {
+            margin-bottom: var(--space-6);
+        }
+        .page-title {
+            font-size: var(--font-size-2xl);
+            font-weight: var(--font-bold);
+            color: var(--text-primary);
+            margin-bottom: var(--space-1);
+        }
+        .page-subtitle {
+            font-size: var(--font-size-sm);
+            color: var(--text-tertiary);
+        }
+        .page-content {
+            overflow-y: auto;
+            height: calc(100vh - 160px);
+        }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- Sidebar navigation -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <a href="/" style="text-decoration:none;color:var(--text-primary);font-weight:700;font-size:1.25rem;">Elite CRM</a>
+        </div>
+        <nav class="nav">
+            <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}"><i class="fa fa-chart-line"></i> Dashboard</a>
+            <a href="/athletes" class="nav-item {% if 'athletes' in request.path %}active{% endif %}"><i class="fa fa-users"></i> Athletes <span class="badge" id="athleteCount"></span></a>
+            <a href="/history" class="nav-item {% if 'history' in request.path %}active{% endif %}"><i class="fa fa-history"></i> History</a>
+            <a href="/communication-hub" class="nav-item {% if 'communication-hub' in request.path %}active{% endif %}"><i class="fa fa-comments"></i> Communication Hub</a>
+        </nav>
+    </aside>
+    <!-- Main content area -->
+    <main class="main-content">
+        <header class="page-header">
+            <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+            <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+        </header>
+        <section class="page-content">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+</div>
+<!-- Alpine.js for lightweight interactivity -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

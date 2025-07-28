@@ -1,0 +1,307 @@
+{% extends "improved_base.html" %}
+
+{% block title %}Elite Athletes • Athletes{% endblock %}
+{% block page_title %}Athletes Management{% endblock %}
+{% block page_subtitle %}Manage your athletes{% endblock %}
+
+{% block extra_css %}
+<style>
+.athletes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-6);
+}
+.athletes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-6);
+}
+.athlete-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-5);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+.athlete-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--primary-500);
+}
+.athlete-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    margin-bottom: var(--space-4);
+}
+.athlete-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-bold);
+    color: white;
+}
+.athlete-info h3 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-semibold);
+    color: var(--text-primary);
+    margin-bottom: var(--space-1);
+}
+.athlete-details {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+.athlete-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+}
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.btn.primary {
+    background: var(--primary-500);
+    color: white;
+    border-color: var(--primary-500);
+}
+.btn.secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-primary);
+}
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+.modal.hidden {
+    display: none;
+}
+.modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    width: 100%;
+    max-width: 480px;
+}
+.form-group {
+    margin-bottom: var(--space-4);
+}
+.form-group label {
+    display: block;
+    margin-bottom: var(--space-1);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+.form-control {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    margin-top: var(--space-6);
+}
+@media (max-width: 768px) {
+    .athletes-header {
+        flex-direction: column;
+        gap: var(--space-4);
+        align-items: stretch;
+    }
+    .athletes-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="athletes-header">
+    <h2>All Athletes</h2>
+    <button id="addAthleteBtn" class="btn primary"><i class="fa fa-plus"></i> Add Athlete</button>
+</div>
+<div id="athletesGrid" class="athletes-grid">
+    <!-- Athlete cards will be inserted here dynamically -->
+</div>
+
+<!-- Modal for adding/editing athletes -->
+<div id="athleteModal" class="modal hidden">
+    <div class="modal-content">
+        <h3 class="chart-title" id="modalTitle">Add New Athlete</h3>
+        <form id="athleteForm">
+            <div class="form-group">
+                <label for="athleteName">Full Name*</label>
+                <input type="text" id="athleteName" class="form-control" placeholder="Athlete name" required>
+            </div>
+            <div class="form-group">
+                <label for="athleteEmail">Email</label>
+                <input type="email" id="athleteEmail" class="form-control" placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="athletePhone">Phone</label>
+                <input type="text" id="athletePhone" class="form-control" placeholder="+34 600 123 456">
+            </div>
+            <div class="form-group">
+                <label for="athleteSport">Sport</label>
+                <input type="text" id="athleteSport" class="form-control" placeholder="Sport discipline">
+            </div>
+            <div class="form-group">
+                <label for="athleteLevel">Level</label>
+                <select id="athleteLevel" class="form-control">
+                    <option value="">Select level</option>
+                    <option value="Beginner">Beginner</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                    <option value="Elite">Elite</option>
+                    <option value="Professional">Professional</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="athleteNotes">Notes</label>
+                <textarea id="athleteNotes" class="form-control" placeholder="Any additional information" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="cancelModalBtn" class="btn secondary">Cancel</button>
+                <button type="submit" class="btn primary">Save Athlete</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Manage athletes list and modal interactions
+let athletes = [];
+let editingIndex = null;
+
+function renderAthleteCard(athlete, index) {
+    const card = document.createElement('div');
+    card.className = 'athlete-card';
+    card.addEventListener('click', () => openEditModal(index));
+    const initials = athlete.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+    card.innerHTML = `
+        <div class="athlete-header">
+            <div class="athlete-avatar">${initials}</div>
+            <div class="athlete-info">
+                <h3>${athlete.name}</h3>
+                <div class="athlete-details">${athlete.sport || 'Unknown Sport'} • ${athlete.level || 'Unspecified'}</div>
+            </div>
+        </div>
+        <div class="athlete-actions">
+            <button class="btn secondary" onclick="event.stopPropagation(); openEditModal(${index});"><i class="fa fa-pen"></i> Edit</button>
+            <button class="btn secondary" onclick="event.stopPropagation(); deleteAthlete(${index});"><i class="fa fa-trash"></i> Delete</button>
+        </div>
+    `;
+    return card;
+}
+
+function renderAthletes() {
+    const grid = document.getElementById('athletesGrid');
+    grid.innerHTML = '';
+    if (athletes.length === 0) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:var(--space-12);color:var(--text-secondary);">
+            <i class="fa fa-users" style="font-size:3rem;margin-bottom:var(--space-4);display:block;"></i>
+            <h3 style="margin-bottom:var(--space-2);">No Athletes Yet</h3>
+            <p>Start by adding your first athlete to the system.</p>
+        </div>`;
+        return;
+    }
+    athletes.forEach((athlete, index) => {
+        grid.appendChild(renderAthleteCard(athlete, index));
+    });
+    // Update athlete count badge
+    const badge = document.getElementById('athleteCount');
+    if (badge) badge.textContent = athletes.length;
+}
+
+function openAddModal() {
+    editingIndex = null;
+    document.getElementById('modalTitle').textContent = 'Add New Athlete';
+    document.getElementById('athleteForm').reset();
+    document.getElementById('athleteModal').classList.remove('hidden');
+}
+
+function openEditModal(index) {
+    editingIndex = index;
+    const athlete = athletes[index];
+    document.getElementById('modalTitle').textContent = 'Edit Athlete';
+    document.getElementById('athleteName').value = athlete.name;
+    document.getElementById('athleteEmail').value = athlete.email || '';
+    document.getElementById('athletePhone').value = athlete.phone || '';
+    document.getElementById('athleteSport').value = athlete.sport || '';
+    document.getElementById('athleteLevel').value = athlete.level || '';
+    document.getElementById('athleteNotes').value = athlete.notes || '';
+    document.getElementById('athleteModal').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('athleteModal').classList.add('hidden');
+}
+
+function deleteAthlete(index) {
+    if (confirm('Are you sure you want to delete this athlete?')) {
+        athletes.splice(index, 1);
+        renderAthletes();
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Add sample athletes for demonstration
+    athletes = [
+        { name: 'Sarah Johnson', sport: 'Tennis', level: 'Elite', email:'sarah@example.com', phone:'+34 123 456 789' },
+        { name: 'Michael Chen', sport: 'Running', level: 'Professional', email:'mchen@example.com', phone:'+34 987 654 321' }
+    ];
+    renderAthletes();
+    document.getElementById('addAthleteBtn').addEventListener('click', openAddModal);
+    document.getElementById('cancelModalBtn').addEventListener('click', closeModal);
+    document.getElementById('athleteForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const athlete = {
+            name: document.getElementById('athleteName').value.trim(),
+            email: document.getElementById('athleteEmail').value.trim(),
+            phone: document.getElementById('athletePhone').value.trim(),
+            sport: document.getElementById('athleteSport').value.trim(),
+            level: document.getElementById('athleteLevel').value,
+            notes: document.getElementById('athleteNotes').value.trim()
+        };
+        if (editingIndex !== null) {
+            athletes[editingIndex] = athlete;
+        } else {
+            athletes.push(athlete);
+        }
+        closeModal();
+        renderAthletes();
+    });
+});
+</script>
+{% endblock %}

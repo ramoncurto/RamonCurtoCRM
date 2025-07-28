@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Elite Athletes CRM{% endblock %}</title>
+    <!-- Main design system stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-Vy45egK6BeS1PGO5ik9zGvnAa7Hz9i0RDo9gRgKkFrk9YVmoMPeW4kW2GszZxLIjPDQiHj6Aq6A4gkgK1q1fXA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+<div class="app-container">
+    <!-- Sidebar navigation -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <span>Elite CRM</span>
+            </div>
+        </div>
+        <nav class="nav-section">
+            <ul class="nav-menu">
+                <li class="nav-item">
+                    <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/athletes" class="nav-link {% if 'athletes' in request.path %}active{% endif %}">
+                        <i class="fas fa-users"></i>
+                        <span>Athletes</span>
+                        <span class="nav-badge" id="athleteCount">0</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/history" class="nav-link {% if 'history' in request.path %}active{% endif %}">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/communication-hub" class="nav-link {% if 'communication-hub' in request.path %}active{% endif %}">
+                        <i class="fas fa-comments"></i>
+                        <span>Communication Hub</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+    <!-- Main content area -->
+    <main class="main-content">
+        <header class="main-header">
+            <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+            <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+        </header>
+        <div class="content-area">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+</div>
+<!-- Alpine.js for lightweight interactivity -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.12.0/dist/cdn.min.js" defer></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html> 

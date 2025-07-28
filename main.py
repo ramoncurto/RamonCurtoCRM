@@ -18,6 +18,10 @@ from openai import AsyncOpenAI
 # Import transcription service
 from transcription_service import transcription_service
 
+# Import workflow system
+from workflow_service import MessageEvent, WorkflowActions, workflow_service
+from workflow_endpoints import add_workflow_endpoints
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -226,6 +230,9 @@ templates = Jinja2Templates(directory="templates")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Add workflow endpoints
+add_workflow_endpoints(app)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -806,13 +813,13 @@ async def get_athlete_history(athlete_id: int) -> JSONResponse:
 @app.get("/athletes", response_class=HTMLResponse)
 async def athletes(request: Request) -> HTMLResponse:
     """Serve the athletes management page."""
-    return templates.TemplateResponse("athletes.html", {"request": request})
+    return templates.TemplateResponse("improved_athletes.html", {"request": request})
 
 
 @app.get("/athletes/manage", response_class=HTMLResponse)
 async def manage_athletes(request: Request) -> HTMLResponse:
     """Serve the athletes management page (legacy route)."""
-    return templates.TemplateResponse("athletes.html", {"request": request})
+    return templates.TemplateResponse("improved_athletes.html", {"request": request})
 
 
 @app.get("/api/athletes/{athlete_id}", response_class=JSONResponse)
@@ -898,7 +905,7 @@ async def delete_athlete(athlete_id: int) -> JSONResponse:
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request) -> HTMLResponse:
     """Serve the enhanced dashboard page."""
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse("improved_dashboard.html", {"request": request})
 
 
 @app.get("/history", response_class=HTMLResponse)
@@ -917,7 +924,7 @@ async def history(request: Request) -> HTMLResponse:
         )
         rows = cursor.fetchall()
     return templates.TemplateResponse(
-        "history.html", {"request": request, "records": rows}
+        "improved_history.html", {"request": request, "records": rows}
     )
 
 
@@ -951,7 +958,7 @@ async def view_athlete_history(request: Request, athlete_id: int) -> HTMLRespons
             )
             rows = cursor.fetchall()
             return templates.TemplateResponse(
-                "history.html", {"request": request, "records": rows}
+                "improved_history.html", {"request": request, "records": rows}
             )
         
         # Get records for this specific athlete
@@ -972,7 +979,7 @@ async def view_athlete_history(request: Request, athlete_id: int) -> HTMLRespons
     }
     
     return templates.TemplateResponse(
-        "history.html", {
+        "improved_history.html", {
             "request": request, 
             "records": rows,
             "athlete": athlete_data
@@ -1107,7 +1114,7 @@ async def send_whatsapp_via_meta(phone: str, message: str) -> dict:
 
 async def process_incoming_message(phone: str, message: str, source: str, external_id: str = None) -> dict:
     """
-    Process an incoming message from WhatsApp or Telegram.
+    Process an incoming message using the new workflow system.
     
     Parameters
     ----------
@@ -1135,39 +1142,34 @@ async def process_incoming_message(phone: str, message: str, source: str, extern
         }
     
     try:
-        # Generate AI response
-        ai_response = await generate_ai_response(message)
+        # Create message event for workflow
+        event = MessageEvent(
+            source_channel=source,
+            source_message_id=external_id or f"{source}_{datetime.datetime.now().timestamp()}",
+            athlete_id=athlete["id"],
+            content_text=message
+        )
         
-        # Save the conversation automatically
-        timestamp = datetime.datetime.now().isoformat()
-        with conn:
-            conn.execute(
-                """
-                INSERT INTO records (
-                    athlete_id, timestamp, transcription, generated_response, 
-                    final_response, category, priority, notes, status, source, external_message_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    athlete["id"],
-                    timestamp,
-                    message,
-                    ai_response,
-                    ai_response,  # Use AI response as final response initially
-                    "general",    # Default category
-                    "medium",     # Default priority
-                    f"Auto-processed {source} message",
-                    "completed",
-                    source,
-                    external_id
-                ),
-            )
+        # Configure default actions
+        actions = WorkflowActions(
+            save_to_history=True,
+            generate_highlights=True,  # Auto-generate highlights
+            suggest_reply=True,        # Auto-suggest reply
+            maybe_todo=True            # Auto-detect todos
+        )
+        
+        # Process through workflow
+        result = await workflow_service.process_incoming_message(event, actions)
+        
+        # Generate AI response for backward compatibility
+        ai_response = await generate_ai_response(message)
         
         return {
             "status": "success",
             "message": f"Message processed for athlete {athlete['name']}",
             "athlete": athlete,
-            "response": ai_response
+            "response": ai_response,
+            "workflow_result": result
         }
     
     except Exception as e:
