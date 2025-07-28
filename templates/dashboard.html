@@ -8,108 +8,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
         :root {
-            /* Brand Colors */
             --primary-500: #6366f1;
             --primary-600: #4f46e5;
-            --primary-700: #4338ca;
-            --secondary-500: #8b5cf6;
-            --secondary-600: #7c3aed;
-            
-            /* Semantic Colors */
-            --success-50: #ecfdf5;
             --success-500: #10b981;
-            --success-600: #059669;
-            --warning-50: #fffbeb;
-            --warning-500: #f59e0b;
-            --warning-600: #d97706;
-            --error-50: #fef2f2;
             --error-500: #ef4444;
-            --error-600: #dc2626;
-            --info-50: #eff6ff;
-            --info-500: #3b82f6;
-            --info-600: #2563eb;
-            
-            /* Neutral Colors */
-            --gray-50: #f8fafc;
-            --gray-100: #f1f5f9;
-            --gray-200: #e2e8f0;
-            --gray-300: #cbd5e1;
-            --gray-400: #94a3b8;
-            --gray-500: #64748b;
-            --gray-600: #475569;
-            --gray-700: #334155;
-            --gray-800: #1e293b;
-            --gray-900: #0f172a;
-            
-            /* Dark Theme */
             --bg-primary: #0a0e1a;
             --bg-secondary: #111827;
-            --bg-tertiary: #1f2937;
-            --bg-surface: #374151;
-            --bg-overlay: rgba(17, 24, 39, 0.8);
-            
-            /* Text Colors */
             --text-primary: #f9fafb;
             --text-secondary: #d1d5db;
-            --text-tertiary: #9ca3af;
-            --text-quaternary: #6b7280;
-            
-            /* Borders */
             --border-primary: #374151;
-            --border-secondary: #4b5563;
-            --border-focus: var(--primary-500);
-            
-            /* Shadows */
-            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-            
-            /* Spacing */
-            --space-1: 0.25rem;
-            --space-2: 0.5rem;
-            --space-3: 0.75rem;
-            --space-4: 1rem;
-            --space-5: 1.25rem;
-            --space-6: 1.5rem;
-            --space-8: 2rem;
-            --space-10: 2.5rem;
-            --space-12: 3rem;
-            --space-16: 4rem;
-            
-            /* Border Radius */
-            --radius-sm: 0.25rem;
-            --radius-md: 0.375rem;
-            --radius-lg: 0.5rem;
-            --radius-xl: 0.75rem;
-            --radius-2xl: 1rem;
-            --radius-3xl: 1.5rem;
-            
-            /* Transitions */
-            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Inter', sans-serif;
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.5;
-            font-feature-settings: 'cv11', 'ss01';
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Sidebar Navigation */
+        /* Sidebar */
         .sidebar {
             position: fixed;
             top: 0;
@@ -124,42 +42,30 @@
         }
 
         .sidebar-header {
-            padding: var(--space-6);
+            padding: 1.5rem;
             border-bottom: 1px solid var(--border-primary);
         }
 
         .logo {
             display: flex;
             align-items: center;
-            gap: var(--space-3);
+            gap: 0.75rem;
             font-size: 1.25rem;
             font-weight: 700;
             color: var(--text-primary);
         }
 
-        .logo-icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-            border-radius: var(--radius-lg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.875rem;
-        }
-
         .nav-section {
-            padding: var(--space-4) var(--space-6);
+            padding: 1rem 1.5rem;
         }
 
         .nav-section-title {
             font-size: 0.75rem;
             font-weight: 600;
-            color: var(--text-quaternary);
+            color: #9ca3af;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin-bottom: var(--space-3);
+            margin-bottom: 0.75rem;
         }
 
         .nav-menu {
@@ -167,54 +73,29 @@
         }
 
         .nav-item {
-            margin-bottom: var(--space-1);
+            margin-bottom: 0.25rem;
         }
 
         .nav-link {
             display: flex;
             align-items: center;
-            gap: var(--space-3);
-            padding: var(--space-3) var(--space-4);
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
             color: var(--text-secondary);
             text-decoration: none;
-            border-radius: var(--radius-lg);
+            border-radius: 0.5rem;
             font-weight: 500;
-            transition: all var(--transition-fast);
-            position: relative;
+            transition: all 0.15s;
         }
 
         .nav-link:hover {
-            background: var(--bg-tertiary);
+            background: #1f2937;
             color: var(--text-primary);
         }
 
         .nav-link.active {
             background: var(--primary-500);
             color: white;
-        }
-
-        .nav-link.active::before {
-            content: '';
-            position: absolute;
-            left: -6px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 3px;
-            height: 16px;
-            background: white;
-            border-radius: 2px;
-        }
-
-        .nav-badge {
-            background: var(--primary-500);
-            color: white;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.125rem 0.375rem;
-            border-radius: 9999px;
-            min-width: 1.25rem;
-            text-align: center;
-            margin-left: auto;
         }
 
         /* Main Content */
@@ -224,344 +105,87 @@
             background: var(--bg-primary);
         }
 
-        /* Top Bar */
-        .top-bar {
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-primary);
-            padding: var(--space-4) var(--space-6);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: var(--space-4);
-            position: sticky;
-            top: 0;
-            z-index: 40;
-        }
-
-        .breadcrumb {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            font-size: 0.875rem;
-            color: var(--text-tertiary);
-        }
-
-        .breadcrumb-separator {
-            color: var(--text-quaternary);
-        }
-
-        .search-bar {
-            position: relative;
-            max-width: 400px;
-            flex: 1;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: var(--space-3) var(--space-4) var(--space-3) var(--space-10);
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            transition: all var(--transition-fast);
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: var(--primary-500);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .search-icon {
-            position: absolute;
-            left: var(--space-3);
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-quaternary);
-            font-size: 0.875rem;
-        }
-
-        .top-bar-actions {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-
-        .btn-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: var(--radius-lg);
-            border: none;
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all var(--transition-fast);
-        }
-
-        .btn-icon:hover {
-            background: var(--bg-surface);
-            color: var(--text-primary);
-        }
-
-        .user-menu {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            padding: var(--space-2);
-            border-radius: var(--radius-lg);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-        }
-
-        .user-menu:hover {
-            background: var(--bg-tertiary);
-        }
-
-        .user-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        /* Content Area */
         .content-area {
-            padding: var(--space-6);
+            padding: 2rem;
         }
 
         .page-header {
-            margin-bottom: var(--space-8);
+            margin-bottom: 2rem;
         }
 
         .page-title {
             font-size: 2rem;
             font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: var(--space-2);
+            margin-bottom: 0.5rem;
         }
 
         .page-subtitle {
             color: var(--text-secondary);
-            font-size: 1rem;
         }
 
-        /* Dashboard Stats */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--space-6);
-            margin-bottom: var(--space-8);
-        }
-
-        .stat-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-2xl);
-            padding: var(--space-6);
-            transition: all var(--transition-base);
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .stat-header {
-            display: flex;
-            align-items: center;
-            justify-content: between;
-            margin-bottom: var(--space-4);
-        }
-
-        .stat-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: var(--radius-xl);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            margin-bottom: var(--space-4);
-        }
-
-        .stat-icon.primary {
-            background: rgba(99, 102, 241, 0.1);
-            color: var(--primary-500);
-        }
-
-        .stat-icon.success {
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success-500);
-        }
-
-        .stat-icon.warning {
-            background: rgba(245, 158, 11, 0.1);
-            color: var(--warning-500);
-        }
-
-        .stat-icon.info {
-            background: rgba(59, 130, 246, 0.1);
-            color: var(--info-500);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: var(--space-1);
-        }
-
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .stat-change {
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-            font-size: 0.75rem;
-            font-weight: 600;
-            margin-top: var(--space-2);
-        }
-
-        .stat-change.positive {
-            color: var(--success-500);
-        }
-
-        .stat-change.negative {
-            color: var(--error-500);
-        }
-
-        /* Content Grid */
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: var(--space-6);
-            margin-bottom: var(--space-8);
-        }
-
-        .main-panel {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-6);
-        }
-
-        .side-panel {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-6);
-        }
-
-        /* Card Component */
+        /* Cards */
         .card {
             background: var(--bg-secondary);
             border: 1px solid var(--border-primary);
-            border-radius: var(--radius-2xl);
-            overflow: hidden;
-            transition: all var(--transition-base);
-        }
-
-        .card:hover {
-            box-shadow: var(--shadow-lg);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
 
         .card-header {
-            padding: var(--space-6);
-            border-bottom: 1px solid var(--border-primary);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            margin-bottom: 1rem;
         }
 
         .card-title {
             font-size: 1.125rem;
             font-weight: 600;
-            color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: var(--space-2);
+            gap: 0.5rem;
         }
 
-        .card-content {
-            padding: var(--space-6);
-        }
-
-        /* Form Components */
+        /* Forms */
         .form-group {
-            margin-bottom: var(--space-5);
+            margin-bottom: 1.25rem;
         }
 
         .form-label {
             display: block;
             font-size: 0.875rem;
             font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: var(--space-2);
+            margin-bottom: 0.5rem;
         }
 
         .form-control {
             width: 100%;
-            padding: var(--space-3) var(--space-4);
-            background: var(--bg-tertiary);
+            padding: 0.75rem;
+            background: #1f2937;
             border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
+            border-radius: 0.5rem;
             color: var(--text-primary);
             font-size: 0.875rem;
-            transition: all var(--transition-fast);
         }
 
         .form-control:focus {
             outline: none;
             border-color: var(--primary-500);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
         }
 
-        .form-control::placeholder {
-            color: var(--text-quaternary);
-        }
-
-        .textarea {
-            resize: vertical;
-            min-height: 120px;
-            font-family: inherit;
-        }
-
-        .select {
-            cursor: pointer;
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-            background-position: right 0.5rem center;
-            background-repeat: no-repeat;
-            background-size: 1.5em 1.5em;
-            padding-right: 2.5rem;
-        }
-
-        /* Button Components */
+        /* Buttons */
         .btn {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            gap: var(--space-2);
-            padding: var(--space-3) var(--space-5);
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: var(--radius-lg);
-            font-size: 0.875rem;
+            border-radius: 0.5rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all var(--transition-fast);
+            transition: all 0.15s;
             text-decoration: none;
-            white-space: nowrap;
         }
 
         .btn-primary {
@@ -571,299 +195,20 @@
 
         .btn-primary:hover {
             background: var(--primary-600);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-md);
         }
 
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            transform: none;
         }
 
         .btn-secondary {
-            background: var(--bg-tertiary);
+            background: #1f2937;
             color: var(--text-secondary);
             border: 1px solid var(--border-primary);
         }
 
-        .btn-secondary:hover {
-            background: var(--bg-surface);
-            color: var(--text-primary);
-        }
-
-        .btn-ghost {
-            background: transparent;
-            color: var(--text-secondary);
-        }
-
-        .btn-ghost:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .btn-sm {
-            padding: var(--space-2) var(--space-4);
-            font-size: 0.75rem;
-        }
-
-        .btn-lg {
-            padding: var(--space-4) var(--space-6);
-            font-size: 1rem;
-        }
-
-        /* Progress Components */
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: var(--bg-tertiary);
-            border-radius: 9999px;
-            overflow: hidden;
-            margin: var(--space-4) 0;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary-500), var(--secondary-500));
-            border-radius: 9999px;
-            transition: width var(--transition-base);
-            position: relative;
-        }
-
-        .progress-fill::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        /* Status Components */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-1);
-            padding: var(--space-1) var(--space-3);
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.025em;
-        }
-
-        .status-badge.success {
-            background: var(--success-50);
-            color: var(--success-600);
-        }
-
-        .status-badge.warning {
-            background: var(--warning-50);
-            color: var(--warning-600);
-        }
-
-        .status-badge.error {
-            background: var(--error-50);
-            color: var(--error-600);
-        }
-
-        .status-badge.info {
-            background: var(--info-50);
-            color: var(--info-600);
-        }
-
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-        }
-
-        /* Activity Feed */
-        .activity-item {
-            display: flex;
-            gap: var(--space-4);
-            padding: var(--space-4) 0;
-            border-bottom: 1px solid var(--border-primary);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.875rem;
-            flex-shrink: 0;
-        }
-
-        .activity-content {
-            flex: 1;
-        }
-
-        .activity-title {
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: var(--space-1);
-        }
-
-        .activity-description {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-bottom: var(--space-2);
-        }
-
-        .activity-time {
-            color: var(--text-quaternary);
-            font-size: 0.75rem;
-        }
-
-        /* Workflow Steps */
-        .workflow-steps {
-            display: flex;
-            align-items: center;
-            margin: var(--space-6) 0;
-        }
-
-        .workflow-step {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            flex: 1;
-        }
-
-        .workflow-step:not(:last-child)::after {
-            content: '';
-            flex: 1;
-            height: 2px;
-            background: var(--border-primary);
-            margin-left: var(--space-3);
-        }
-
-        .workflow-step.completed::after {
-            background: var(--primary-500);
-        }
-
-        .step-indicator {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            font-weight: 600;
-            background: var(--bg-tertiary);
-            color: var(--text-quaternary);
-            border: 2px solid var(--border-primary);
-        }
-
-        .step-indicator.completed {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
-        }
-
-        .step-indicator.current {
-            background: var(--primary-50);
-            color: var(--primary-600);
-            border-color: var(--primary-500);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .step-label {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .step-label.completed {
-            color: var(--text-primary);
-        }
-
-        /* Notification Toast */
-        .toast {
-            position: fixed;
-            top: var(--space-6);
-            right: var(--space-6);
-            max-width: 400px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-xl);
-            padding: var(--space-4);
-            box-shadow: var(--shadow-2xl);
-            z-index: 60;
-            transform: translateX(120%);
-            transition: all var(--transition-base);
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast-content {
-            display: flex;
-            align-items: flex-start;
-            gap: var(--space-3);
-        }
-
-        .toast-icon {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            flex-shrink: 0;
-        }
-
-        .toast-icon.success {
-            background: var(--success-500);
-            color: white;
-        }
-
-        .toast-icon.error {
-            background: var(--error-500);
-            color: white;
-        }
-
-        .toast-body {
-            flex: 1;
-        }
-
-        .toast-title {
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: var(--space-1);
-        }
-
-        .toast-description {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-
-        /* Loading States */
+        /* Loading */
         .loading-spinner {
             width: 20px;
             height: 20px;
@@ -877,94 +222,14 @@
             to { transform: rotate(360deg); }
         }
 
-        .skeleton {
-            background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-surface) 50%, var(--bg-tertiary) 75%);
-            background-size: 200% 100%;
-            animation: skeleton-loading 1.5s infinite;
-            border-radius: var(--radius-md);
-        }
-
-        @keyframes skeleton-loading {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-
-        /* Responsive Design */
-        @media (max-width: 1024px) {
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .side-panel {
-                order: -1;
-            }
-        }
-
+        /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
-                transition: transform var(--transition-base);
             }
-            
-            .sidebar.mobile-open {
-                transform: translateX(0);
-            }
-            
             .main-content {
                 margin-left: 0;
             }
-            
-            .top-bar {
-                padding: var(--space-4);
-            }
-            
-            .search-bar {
-                display: none;
-            }
-            
-            .content-area {
-                padding: var(--space-4);
-            }
-            
-            .stats-grid {
-                grid-template-columns: 1fr;
-                gap: var(--space-4);
-            }
-            
-            .page-title {
-                font-size: 1.5rem;
-            }
-        }
-
-        /* Utility Classes */
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
         }
     </style>
 </head>
@@ -973,9 +238,7 @@
     <nav class="sidebar">
         <div class="sidebar-header">
             <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-dumbbell"></i>
-                </div>
+                <i class="fas fa-dumbbell" style="color: var(--primary-500);"></i>
                 <span>Elite Athletes</span>
             </div>
         </div>
@@ -993,14 +256,12 @@
                     <a href="/athletes/manage" class="nav-link">
                         <i class="fas fa-users"></i>
                         Athletes
-                        <span class="nav-badge">12</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/conversations" class="nav-link">
-                        <i class="fas fa-comments"></i>
-                        Conversations
-                        <span class="nav-badge">3</span>
+                    <a href="/history" class="nav-link">
+                        <i class="fas fa-history"></i>
+                        History
                     </a>
                 </li>
             </ul>
@@ -1010,39 +271,9 @@
             <div class="nav-section-title">Tools</div>
             <ul class="nav-menu">
                 <li class="nav-item">
-                    <a href="/audio-processing" class="nav-link">
+                    <a href="/dashboard" class="nav-link active">
                         <i class="fas fa-microphone"></i>
                         Audio Processing
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="/analytics" class="nav-link">
-                        <i class="fas fa-chart-bar"></i>
-                        Analytics
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="/reports" class="nav-link">
-                        <i class="fas fa-file-alt"></i>
-                        Reports
-                    </a>
-                </li>
-            </ul>
-        </div>
-        
-        <div class="nav-section">
-            <div class="nav-section-title">Settings</div>
-            <ul class="nav-menu">
-                <li class="nav-item">
-                    <a href="/integrations" class="nav-link">
-                        <i class="fas fa-plug"></i>
-                        Integrations
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a href="/settings" class="nav-link">
-                        <i class="fas fa-cog"></i>
-                        Settings
                     </a>
                 </li>
             </ul>
@@ -1051,437 +282,131 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <!-- Top Bar -->
-        <div class="top-bar">
-            <div class="breadcrumb">
-                <span>Dashboard</span>
-                <span class="breadcrumb-separator">/</span>
-                <span>Audio Processing</span>
-            </div>
-            
-            <div class="search-bar">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" class="search-input" placeholder="Search athletes, conversations...">
-            </div>
-            
-            <div class="top-bar-actions">
-                <button class="btn-icon" title="Notifications">
-                    <i class="fas fa-bell"></i>
-                </button>
-                <button class="btn-icon" title="Help">
-                    <i class="fas fa-question-circle"></i>
-                </button>
-                <div class="user-menu">
-                    <div class="user-avatar">JD</div>
-                    <span class="sr-only">User menu</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Content Area -->
         <div class="content-area">
-            <!-- Page Header -->
             <div class="page-header">
                 <h1 class="page-title">Audio Processing Dashboard</h1>
                 <p class="page-subtitle">Process and manage athlete audio communications with AI-powered transcription and response generation</p>
             </div>
 
-            <!-- Dashboard Stats -->
-            <div class="stats-grid">
-                <div class="stat-card animate-fade-in">
-                    <div class="stat-icon primary">
-                        <i class="fas fa-microphone"></i>
-                    </div>
-                    <div class="stat-value">147</div>
-                    <div class="stat-label">Total Recordings</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        +12% this month
-                    </div>
+            <!-- Athlete Selection -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-user-circle"></i>
+                        Athlete Selection
+                    </h2>
+                    <button class="btn btn-secondary" onclick="loadAthletes()">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
                 </div>
-                
-                <div class="stat-card animate-fade-in">
-                    <div class="stat-icon success">
-                        <i class="fas fa-check-circle"></i>
-                    </div>
-                    <div class="stat-value">95%</div>
-                    <div class="stat-label">Processing Success Rate</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        +2.3% this week
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Select Athlete</label>
+                    <select id="athleteSelect" class="form-control" onchange="selectAthlete()">
+                        <option value="">Choose an athlete...</option>
+                    </select>
                 </div>
-                
-                <div class="stat-card animate-fade-in">
-                    <div class="stat-icon warning">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                    <div class="stat-value">2.4s</div>
-                    <div class="stat-label">Avg. Processing Time</div>
-                    <div class="stat-change negative">
-                        <i class="fas fa-arrow-down"></i>
-                        -0.3s improved
-                    </div>
-                </div>
-                
-                <div class="stat-card animate-fade-in">
-                    <div class="stat-icon info">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="stat-value">12</div>
-                    <div class="stat-label">Active Athletes</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        +2 this month
-                    </div>
-                </div>
+                <button class="btn btn-primary" onclick="createAthlete()">
+                    <i class="fas fa-plus"></i>
+                    Add New Athlete
+                </button>
             </div>
 
-            <!-- Content Grid -->
-            <div class="content-grid">
-                <!-- Main Panel -->
-                <div class="main-panel">
-                    <!-- Athlete Selection -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i class="fas fa-user-circle"></i>
-                                Athlete Selection
-                            </h2>
-                            <button class="btn btn-ghost btn-sm" onclick="refreshAthletes()">
-                                <i class="fas fa-sync-alt"></i>
-                                Refresh
-                            </button>
-                        </div>
-                        <div class="card-content">
-                            <div class="form-group">
-                                <label class="form-label" for="athleteSelect">Select Athlete</label>
-                                <select class="form-control select" id="athleteSelect" onchange="selectAthlete()">
-                                    <option value="">Choose an athlete...</option>
-                                </select>
-                            </div>
-                            <button class="btn btn-primary" onclick="showCreateAthleteModal()">
-                                <i class="fas fa-plus"></i>
-                                Add New Athlete
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Processing Workflow -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i class="fas fa-route"></i>
-                                Processing Workflow
-                            </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="workflow-steps">
-                                <div class="workflow-step" id="step-upload">
-                                    <div class="step-indicator">1</div>
-                                    <div class="step-label">Upload Audio</div>
-                                </div>
-                                <div class="workflow-step" id="step-transcribe">
-                                    <div class="step-indicator">2</div>
-                                    <div class="step-label">Transcribe</div>
-                                </div>
-                                <div class="workflow-step" id="step-generate">
-                                    <div class="step-indicator">3</div>
-                                    <div class="step-label">Generate Response</div>
-                                </div>
-                                <div class="workflow-step" id="step-finalize">
-                                    <div class="step-indicator">4</div>
-                                    <div class="step-label">Finalize & Save</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Audio Upload -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i class="fas fa-upload"></i>
-                                Audio Upload
-                            </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="form-group">
-                                <label class="form-label" for="audioFile">Upload Audio Message</label>
-                                <input type="file" id="audioFile" accept="audio/*" class="form-control" onchange="handleFileSelect()">
-                                <div class="progress-bar" id="uploadProgress" style="display: none;">
-                                    <div class="progress-fill" id="uploadProgressFill"></div>
-                                </div>
-                            </div>
-                            <button class="btn btn-primary btn-lg" onclick="uploadFile()" id="uploadBtn" disabled>
-                                <i class="fas fa-microphone-alt"></i>
-                                Start Transcription
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Transcription & Response -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i class="fas fa-file-alt"></i>
-                                Transcription & Response
-                            </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="form-group">
-                                <label class="form-label" for="transcription">Transcribed Text</label>
-                                <textarea id="transcription" class="form-control textarea" placeholder="Audio transcription will appear here automatically..."></textarea>
-                            </div>
-                            
-                            <button class="btn btn-primary" onclick="generateResponse()" id="generateBtn" disabled>
-                                <i class="fas fa-robot"></i>
-                                Generate AI Response
-                            </button>
-                            
-                            <div class="form-group" style="margin-top: var(--space-6);">
-                                <label class="form-label" for="generated_response">AI Generated Response</label>
-                                <textarea id="generated_response" class="form-control textarea" placeholder="AI-generated response will appear here..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Final Response -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h2 class="card-title">
-                                <i class="fas fa-edit"></i>
-                                Final Response
-                            </h2>
-                        </div>
-                        <div class="card-content">
-                            <div class="form-group">
-                                <label class="form-label" for="final_response">Edit & Customize Response</label>
-                                <textarea id="final_response" class="form-control textarea" placeholder="Review and edit the AI response to match your communication style..."></textarea>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="category">Category</label>
-                                <select id="category" class="form-control select">
-                                    <option value="training">Training</option>
-                                    <option value="nutrition">Nutrition</option>
-                                    <option value="recovery">Recovery</option>
-                                    <option value="competition">Competition</option>
-                                    <option value="general">General</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="priority">Priority Level</label>
-                                <select id="priority" class="form-control select">
-                                    <option value="low">Low Priority</option>
-                                    <option value="medium" selected>Medium Priority</option>
-                                    <option value="high">High Priority</option>
-                                    <option value="urgent">Urgent</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="notes">Additional Notes</label>
-                                <textarea id="notes" class="form-control textarea" placeholder="Add any additional context or notes..."></textarea>
-                            </div>
-                            
-                            <button class="btn btn-primary btn-lg" onclick="saveAll()" id="saveBtn" disabled>
-                                <i class="fas fa-save"></i>
-                                Save Response
-                            </button>
-                        </div>
-                    </div>
+            <!-- Audio Upload -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-upload"></i>
+                        Audio Upload
+                    </h2>
                 </div>
-
-                <!-- Side Panel -->
-                <div class="side-panel">
-                    <!-- Recent Activity -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-history"></i>
-                                Recent Activity
-                            </h3>
-                        </div>
-                        <div class="card-content">
-                            <div class="activity-item">
-                                <div class="activity-avatar">MW</div>
-                                <div class="activity-content">
-                                    <div class="activity-title">Michael Wilson</div>
-                                    <div class="activity-description">New audio message processed</div>
-                                    <div class="activity-time">2 hours ago</div>
-                                </div>
-                            </div>
-                            <div class="activity-item">
-                                <div class="activity-avatar">SJ</div>
-                                <div class="activity-content">
-                                    <div class="activity-title">Sarah Johnson</div>
-                                    <div class="activity-description">Response saved and sent</div>
-                                    <div class="activity-time">4 hours ago</div>
-                                </div>
-                            </div>
-                            <div class="activity-item">
-                                <div class="activity-avatar">DL</div>
-                                <div class="activity-content">
-                                    <div class="activity-title">David Lee</div>
-                                    <div class="activity-description">Training plan updated</div>
-                                    <div class="activity-time">1 day ago</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Quick Stats -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-chart-pie"></i>
-                                Quick Stats
-                            </h3>
-                        </div>
-                        <div class="card-content">
-                            <div style="margin-bottom: var(--space-4);">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
-                                    <span class="form-label">Today's Processing</span>
-                                    <span class="status-badge success">8/10</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 80%;"></div>
-                                </div>
-                            </div>
-                            
-                            <div style="margin-bottom: var(--space-4);">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
-                                    <span class="form-label">Response Rate</span>
-                                    <span class="status-badge info">95%</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 95%;"></div>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-2);">
-                                    <span class="form-label">Quality Score</span>
-                                    <span class="status-badge success">4.8/5</span>
-                                </div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: 96%;"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- System Status -->
-                    <div class="card animate-slide-up">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                <i class="fas fa-server"></i>
-                                System Status
-                            </h3>
-                        </div>
-                        <div class="card-content">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
-                                <span>Transcription Service</span>
-                                <span class="status-badge success">
-                                    <span class="status-dot"></span>
-                                    Online
-                                </span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
-                                <span>AI Response Engine</span>
-                                <span class="status-badge success">
-                                    <span class="status-dot"></span>
-                                    Online
-                                </span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span>Database</span>
-                                <span class="status-badge success">
-                                    <span class="status-dot"></span>
-                                    Online
-                                </span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Upload Audio Message</label>
+                    <input type="file" id="audioFile" accept="audio/*" class="form-control" onchange="updateButtonStates()">
                 </div>
+                <button class="btn btn-primary" onclick="uploadFile()" id="uploadBtn" disabled>
+                    <i class="fas fa-microphone-alt"></i>
+                    Start Transcription
+                </button>
+            </div>
+
+            <!-- Transcription -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-file-alt"></i>
+                        Transcription
+                    </h2>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Transcribed Text</label>
+                    <textarea id="transcription" class="form-control" rows="4" placeholder="Audio transcription will appear here..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="generateResponse()" id="generateBtn" disabled>
+                    <i class="fas fa-robot"></i>
+                    Generate AI Response
+                </button>
+            </div>
+
+            <!-- Final Response -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-edit"></i>
+                        Final Response
+                    </h2>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Edit & Customize Response</label>
+                    <textarea id="final_response" class="form-control" rows="4" placeholder="Review and edit the AI response..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <select id="category" class="form-control">
+                        <option value="training">Training</option>
+                        <option value="nutrition">Nutrition</option>
+                        <option value="recovery">Recovery</option>
+                        <option value="competition">Competition</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="saveAll()" id="saveBtn" disabled>
+                    <i class="fas fa-save"></i>
+                    Save Response
+                </button>
             </div>
         </div>
     </main>
 
-    <!-- Toast Notification -->
-    <div class="toast" id="toast">
-        <div class="toast-content">
-            <div class="toast-icon" id="toastIcon">
-                <i class="fas fa-check"></i>
-            </div>
-            <div class="toast-body">
-                <div class="toast-title" id="toastTitle">Success</div>
-                <div class="toast-description" id="toastDescription">Operation completed successfully</div>
-            </div>
-        </div>
-    </div>
-
     <script>
         let selectedAthlete = null;
         let athletes = [];
-        let currentStep = 1;
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', function() {
-            loadAthletes();
-            updateWorkflowSteps();
-            
-            // Add event listeners
-            document.getElementById('transcription').addEventListener('input', updateButtonStates);
-            document.getElementById('generated_response').addEventListener('input', updateButtonStates);
-            document.getElementById('final_response').addEventListener('input', updateButtonStates);
-        });
-
-        // Load athletes from API
+        // Load real athletes from API
         async function loadAthletes() {
             try {
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 500));
+                const response = await fetch('/athletes');
+                const data = await response.json();
+                athletes = data.athletes;
                 
-                // Mock data for demonstration
-                athletes = [
-                    { id: 1, name: 'Michael Wilson', sport: 'Basketball', level: 'Professional' },
-                    { id: 2, name: 'Sarah Johnson', sport: 'Tennis', level: 'Semi-Professional' },
-                    { id: 3, name: 'David Lee', sport: 'Swimming', level: 'Olympic' },
-                    { id: 4, name: 'Emma Davis', sport: 'Track & Field', level: 'Collegiate' }
-                ];
+                const select = document.getElementById('athleteSelect');
+                select.innerHTML = '<option value="">Choose an athlete...</option>';
                 
-                populateAthleteSelect();
-                showToast('Athletes loaded successfully', 'success');
+                athletes.forEach(athlete => {
+                    const option = document.createElement('option');
+                    option.value = athlete.id;
+                    option.textContent = `${athlete.name}${athlete.sport ? ' • ' + athlete.sport : ''}${athlete.level ? ' • ' + athlete.level : ''}`;
+                    select.appendChild(option);
+                });
             } catch (error) {
-                showToast('Error loading athletes', 'error');
+                console.error('Error loading athletes:', error);
+                alert('Error loading athletes');
             }
-        }
-
-        function populateAthleteSelect() {
-            const select = document.getElementById('athleteSelect');
-            select.innerHTML = '<option value="">Choose an athlete...</option>';
-            
-            athletes.forEach(athlete => {
-                const option = document.createElement('option');
-                option.value = athlete.id;
-                option.textContent = `${athlete.name} • ${athlete.sport} • ${athlete.level}`;
-                select.appendChild(option);
-            });
         }
 
         function selectAthlete() {
             const select = document.getElementById('athleteSelect');
             selectedAthlete = select.value ? parseInt(select.value) : null;
-            
-            if (selectedAthlete) {
-                currentStep = 1;
-                updateWorkflowSteps();
-                showToast('Athlete selected', 'success');
-            }
-            
             updateButtonStates();
         }
 
@@ -1489,183 +414,120 @@
             const hasAthlete = selectedAthlete !== null;
             const hasFile = document.getElementById('audioFile').files.length > 0;
             const hasTranscription = document.getElementById('transcription').value.trim() !== '';
-            const hasGenerated = document.getElementById('generated_response').value.trim() !== '';
             const hasFinal = document.getElementById('final_response').value.trim() !== '';
 
-            // Update button states
             document.getElementById('uploadBtn').disabled = !hasAthlete || !hasFile;
             document.getElementById('generateBtn').disabled = !hasAthlete || !hasTranscription;
             document.getElementById('saveBtn').disabled = !hasAthlete || !hasFinal;
         }
 
-        function updateWorkflowSteps() {
-            const steps = ['step-upload', 'step-transcribe', 'step-generate', 'step-finalize'];
-            
-            steps.forEach((stepId, index) => {
-                const step = document.getElementById(stepId);
-                const indicator = step.querySelector('.step-indicator');
-                const label = step.querySelector('.step-label');
-                
-                step.classList.remove('completed');
-                indicator.classList.remove('completed', 'current');
-                label.classList.remove('completed');
-                
-                if (index + 1 < currentStep) {
-                    step.classList.add('completed');
-                    indicator.classList.add('completed');
-                    label.classList.add('completed');
-                    indicator.innerHTML = '<i class="fas fa-check"></i>';
-                } else if (index + 1 === currentStep) {
-                    indicator.classList.add('current');
-                    indicator.textContent = index + 1;
-                } else {
-                    indicator.textContent = index + 1;
-                }
-            });
-        }
-
-        function handleFileSelect() {
-            const fileInput = document.getElementById('audioFile');
-            if (fileInput.files.length > 0) {
-                showToast('Audio file selected', 'success');
-            }
-            updateButtonStates();
-        }
-
+        // Real transcription using API
         async function uploadFile() {
             const fileInput = document.getElementById('audioFile');
             if (!fileInput.files.length || !selectedAthlete) return;
 
             const uploadBtn = document.getElementById('uploadBtn');
-            const progressBar = document.getElementById('uploadProgress');
-            const progressFill = document.getElementById('uploadProgressFill');
-            
-            // Update UI
-            uploadBtn.innerHTML = '<div class="loading-spinner"></div> Processing Audio...';
             uploadBtn.disabled = true;
-            progressBar.style.display = 'block';
-            
-            // Simulate upload progress
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress > 90) progress = 90;
-                progressFill.style.width = progress + '%';
-            }, 200);
+            uploadBtn.innerHTML = '<div class="loading-spinner"></div> Processing...';
 
             try {
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
                 
-                clearInterval(progressInterval);
-                progressFill.style.width = '100%';
-                
-                setTimeout(() => {
-                    // Mock transcription result
-                    document.getElementById('transcription').value = "Hey coach, I wanted to update you on my training this week. I've been focusing on my sprint intervals and I think I'm seeing some improvement in my times. My 100m splits are getting more consistent. I do have a question about my nutrition though - should I be increasing my protein intake on heavy training days? Let me know what you think. Thanks!";
-                    
-                    progressBar.style.display = 'none';
-                    progressFill.style.width = '0%';
-                    uploadBtn.innerHTML = '<i class="fas fa-microphone-alt"></i> Start Transcription';
-                    uploadBtn.disabled = false;
-                    
-                    currentStep = 2;
-                    updateWorkflowSteps();
-                    updateButtonStates();
-                    
-                    showToast('Audio transcribed successfully', 'success');
-                }, 500);
+                const data = await response.json();
+                document.getElementById('transcription').value = data.transcription;
+                updateButtonStates();
                 
             } catch (error) {
-                clearInterval(progressInterval);
-                progressBar.style.display = 'none';
-                uploadBtn.innerHTML = '<i class="fas fa-microphone-alt"></i> Start Transcription';
+                console.error('Error:', error);
+                alert('Error processing audio: ' + error.message);
+            } finally {
                 uploadBtn.disabled = false;
-                showToast('Error processing audio', 'error');
+                uploadBtn.innerHTML = '<i class="fas fa-microphone-alt"></i> Start Transcription';
             }
         }
 
+        // Real AI response generation
         async function generateResponse() {
             const transcription = document.getElementById('transcription').value;
             if (!transcription || !selectedAthlete) return;
 
             const generateBtn = document.getElementById('generateBtn');
-            generateBtn.innerHTML = '<div class="loading-spinner"></div> Generating Response...';
             generateBtn.disabled = true;
+            generateBtn.innerHTML = '<div class="loading-spinner"></div> Generating...';
 
             try {
-                // Simulate AI processing
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                const formData = new FormData();
+                formData.append('transcription', transcription);
+
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
                 
-                // Mock AI response
-                const response = "Great work on your sprint intervals! It's fantastic to hear you're seeing improvement in your 100m consistency - that's exactly what we want to see. Regarding your nutrition question, yes, I'd recommend increasing your protein intake to about 1.2-1.4g per kg of body weight on heavy training days. Focus on getting protein within 30 minutes post-workout for optimal recovery. Also consider adding some complex carbs to refuel your glycogen stores. Keep up the excellent work and let's check in again next week!";
-                
-                document.getElementById('generated_response').value = response;
-                document.getElementById('final_response').value = response;
-                
-                generateBtn.innerHTML = '<i class="fas fa-robot"></i> Generate AI Response';
-                generateBtn.disabled = false;
-                
-                currentStep = 3;
-                updateWorkflowSteps();
+                const data = await response.json();
+                document.getElementById('generated_response').value = data.generated_response;
+                document.getElementById('final_response').value = data.generated_response;
                 updateButtonStates();
                 
-                showToast('AI response generated successfully', 'success');
-                
             } catch (error) {
-                generateBtn.innerHTML = '<i class="fas fa-robot"></i> Generate AI Response';
+                console.error('Error:', error);
+                alert('Error generating response: ' + error.message);
+            } finally {
                 generateBtn.disabled = false;
-                showToast('Error generating response', 'error');
+                generateBtn.innerHTML = '<i class="fas fa-robot"></i> Generate AI Response';
             }
         }
 
+        // Real save using API
         async function saveAll() {
             if (!selectedAthlete) return;
 
             const saveBtn = document.getElementById('saveBtn');
-            saveBtn.innerHTML = '<div class="loading-spinner"></div> Saving...';
             saveBtn.disabled = true;
+            saveBtn.innerHTML = '<div class="loading-spinner"></div> Saving...';
 
             try {
-                // Simulate save operation
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                const formData = new FormData();
+                formData.append('athlete_id', selectedAthlete);
+                formData.append('transcription', document.getElementById('transcription').value);
+                formData.append('generated_response', document.getElementById('generated_response').value);
+                formData.append('final_response', document.getElementById('final_response').value);
+                formData.append('category', document.getElementById('category').value);
+                formData.append('priority', 'medium');
+
+                const response = await fetch('/save', {
+                    method: 'POST',
+                    body: formData
+                });
                 
-                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Response';
-                saveBtn.disabled = false;
-                
-                currentStep = 4;
-                updateWorkflowSteps();
-                
-                showToast('Response saved successfully', 'success');
-                
-                // Reset form after successful save
-                setTimeout(() => {
-                    clearForm();
-                }, 2000);
+                const data = await response.json();
+                if (data.status === 'saved') {
+                    alert('Response saved successfully!');
+                    // Reset form
+                    document.getElementById('audioFile').value = '';
+                    document.getElementById('transcription').value = '';
+                    document.getElementById('generated_response').value = '';
+                    document.getElementById('final_response').value = '';
+                    updateButtonStates();
+                }
                 
             } catch (error) {
-                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Response';
+                console.error('Error:', error);
+                alert('Error saving response: ' + error.message);
+            } finally {
                 saveBtn.disabled = false;
-                showToast('Error saving response', 'error');
+                saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Response';
             }
         }
 
-        function clearForm() {
-            document.getElementById('transcription').value = '';
-            document.getElementById('generated_response').value = '';
-            document.getElementById('final_response').value = '';
-            document.getElementById('notes').value = '';
-            document.getElementById('audioFile').value = '';
-            document.getElementById('category').value = 'training';
-            document.getElementById('priority').value = 'medium';
-            
-            currentStep = 1;
-            updateWorkflowSteps();
-            updateButtonStates();
-        }
-
-        function showCreateAthleteModal() {
-            // In a real application, this would open a proper modal
+        // Real athlete creation
+        async function createAthlete() {
             const name = prompt('Enter athlete name:');
             if (!name) return;
 
@@ -1674,65 +536,41 @@
             const sport = prompt('Enter sport (optional):') || '';
             const level = prompt('Enter level (optional):') || '';
 
-            createAthlete(name, email, phone, sport, level);
-        }
-
-        async function createAthlete(name, email, phone, sport, level) {
             try {
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('email', email);
+                formData.append('phone', phone);
+                formData.append('sport', sport);
+                formData.append('level', level);
+
+                const response = await fetch('/athletes', {
+                    method: 'POST',
+                    body: formData
+                });
                 
-                // Add to mock data
-                const newAthlete = {
-                    id: athletes.length + 1,
-                    name,
-                    email,
-                    phone,
-                    sport,
-                    level
-                };
-                athletes.push(newAthlete);
-                
-                populateAthleteSelect();
-                showToast('Athlete created successfully', 'success');
+                const data = await response.json();
+                if (data.status === 'created') {
+                    alert('Athlete created successfully!');
+                    loadAthletes();
+                }
                 
             } catch (error) {
-                showToast('Error creating athlete', 'error');
+                console.error('Error:', error);
+                alert('Error creating athlete: ' + error.message);
             }
         }
 
-        function refreshAthletes() {
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
             loadAthletes();
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            const icon = document.getElementById('toastIcon');
-            const title = document.getElementById('toastTitle');
-            const description = document.getElementById('toastDescription');
+            updateButtonStates();
             
-            // Update content
-            title.textContent = type === 'success' ? 'Success' : 'Error';
-            description.textContent = message;
-            
-            // Update styling
-            icon.className = `toast-icon ${type}`;
-            icon.innerHTML = type === 'success' ? '<i class="fas fa-check"></i>' : '<i class="fas fa-exclamation-triangle"></i>';
-            
-            // Show toast
-            toast.classList.add('show');
-            
-            // Hide after 4 seconds
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 4000);
-        }
-
-        // Mobile menu toggle (for responsive design)
-        function toggleMobileMenu() {
-            const sidebar = document.querySelector('.sidebar');
-            sidebar.classList.toggle('mobile-open');
-        }
+            // Add event listeners
+            document.getElementById('transcription').addEventListener('input', updateButtonStates);
+            document.getElementById('final_response').addEventListener('input', updateButtonStates);
+            document.getElementById('audioFile').addEventListener('change', updateButtonStates);
+        });
     </script>
 </body>
 </html>

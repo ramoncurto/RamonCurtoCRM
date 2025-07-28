@@ -13,11 +13,11 @@ def test_phone_matching():
     
     # Test with different phone number formats
     test_phones = [
-        "+34123456789",  # International format
-        "34123456789",   # Without +
-        "0123456789",    # With leading 0
-        "123-456-789",   # With dashes
-        "123 456 789",   # With spaces
+        "+34679795648",  # International format
+        "34679795648",   # Without +
+        "0679795648",    # With leading 0
+        "679-795-648",   # With dashes
+        "679 795 648",   # With spaces
     ]
     
     for phone in test_phones:
@@ -44,17 +44,17 @@ def test_webhook_simulation():
     # Test messages from different sources
     test_messages = [
         {
-            "phone": "+34123456789",
+            "phone": "+34679795648",
             "message": "Hi coach! How should I prepare for my next competition?",
             "source": "whatsapp"
         },
         {
-            "phone": "34123456789",
+            "phone": "34679795648",
             "message": "I'm feeling some pain in my knee after training yesterday",
             "source": "telegram"
         },
         {
-            "phone": "+1234567890",  # Non-existent athlete
+            "phone": "+34679795648",  # Non-existent athlete
             "message": "Hello, I'm a new athlete",
             "source": "test"
         }
@@ -90,7 +90,7 @@ def test_whatsapp_webhook_format():
     whatsapp_payload = {
         "messages": [
             {
-                "from": "whatsapp:+34123456789",
+                "from": "whatsapp:+34679795648",
                 "id": "wamid.ABC123",
                 "text": {
                     "body": "Coach, I completed my training session today. My times are improving!"

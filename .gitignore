@@ -43,5 +43,8 @@ uploads/
 *.db
 __pycache__/
 
+# Environment variables
+.env
+
 # Logs
 *.log

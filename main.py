@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import datetime
+import logging
 from typing import Optional
 import re
 import json
@@ -12,6 +13,13 @@ from fastapi.templating import Jinja2Templates
 # OpenAI imports for GPT-4o-mini integration
 from dotenv import load_dotenv
 from openai import AsyncOpenAI
+
+# Import transcription service
+from transcription_service import transcription_service
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -183,6 +191,23 @@ with conn:
         """
     )
     
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS athlete_highlights (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            athlete_id INTEGER,
+            highlight_text TEXT NOT NULL,
+            category TEXT,
+            source_conversation_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN DEFAULT 1,
+            FOREIGN KEY (athlete_id) REFERENCES athletes (id),
+            FOREIGN KEY (source_conversation_id) REFERENCES records (id)
+        )
+        """
+    )
+    
     # Add source column if it doesn't exist (for existing databases)
     try:
         conn.execute("ALTER TABLE records ADD COLUMN source TEXT DEFAULT 'manual'")
@@ -223,20 +248,54 @@ async def transcribe(file: UploadFile = File(...)) -> JSONResponse:
     """
     # Read the uploaded file contents
     contents = await file.read()
+    
     # Create a unique filename using timestamp to avoid collisions
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
-    safe_name = file.filename.replace(" ", "_")
+    safe_name = re.sub(r'[^\w\-_\.]', '_', file.filename)  # Sanitize filename
     filename = f"{timestamp}_{safe_name}"
-    file_path = os.path.join('uploads', filename)
+    
+    # Use absolute path for uploads directory
+    uploads_dir = os.path.abspath('uploads')
+    file_path = os.path.join(uploads_dir, filename)
+    
+    # Ensure uploads directory exists
+    os.makedirs(uploads_dir, exist_ok=True)
+    
     # Save the file to disk
-    with open(file_path, 'wb') as out_file:
-        out_file.write(contents)
-    # Placeholder transcription logic: replace this with actual speech‑to‑text
-    transcript = (
-        f"[Transcripción de {file.filename} no implementada: por favor "
-        f"edita este texto manualmente]"
-    )
-    return JSONResponse({"transcription": transcript, "filename": filename})
+    try:
+        logger.info(f"Saving file to: {file_path}")
+        with open(file_path, 'wb') as out_file:
+            out_file.write(contents)
+        
+        # Verify file was created and is not empty
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not created: {file_path}")
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            raise ValueError("File is empty")
+            
+        logger.info(f"File saved successfully: {file_path} ({file_size} bytes)")
+        
+        # Use Whisper for actual transcription
+        transcription = transcription_service.transcribe_audio(file_path)
+        
+        if transcription is None:
+            transcription = (
+                f"[Error transcribing {file.filename}. Please check the audio format]"
+            )
+        
+        return JSONResponse({"transcription": transcription, "filename": filename})
+        
+    except Exception as e:
+        logger.error(f"Transcription error: {str(e)}")
+        # Clean up file if it exists
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        return JSONResponse({
+            "transcription": f"[Error: {str(e)}]",
+            "filename": None
+        }, status_code=500)
 
 
 def find_best_match(transcription: str) -> Optional[str]:
@@ -919,3 +978,381 @@ async def find_athlete_by_phone_endpoint(phone: str) -> JSONResponse:
             "status": "not_found",
             "message": f"No athlete found for phone number {phone}"
         }, status_code=404)
+
+
+# Functions for managing athlete highlights
+
+def add_athlete_highlight(
+    athlete_id: int, 
+    highlight_text: str, 
+    category: str = "general", 
+    source_conversation_id: Optional[int] = None
+) -> dict:
+    """
+    Add a new highlight for an athlete.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    highlight_text : str
+        The key point or summary to highlight
+    category : str
+        Category of the highlight (training, nutrition, recovery, etc.)
+    source_conversation_id : int, optional
+        ID of the conversation this highlight was derived from
+        
+    Returns
+    -------
+    dict
+        Result with status and highlight ID
+    """
+    try:
+        with conn:
+            cursor = conn.execute(
+                """
+                INSERT INTO athlete_highlights 
+                (athlete_id, highlight_text, category, source_conversation_id)
+                VALUES (?, ?, ?, ?)
+                """,
+                (athlete_id, highlight_text, category, source_conversation_id)
+            )
+            highlight_id = cursor.lastrowid
+        return {
+            "status": "success",
+            "highlight_id": highlight_id,
+            "message": "Highlight added successfully"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error adding highlight: {str(e)}"
+        }
+
+
+def get_athlete_highlights(athlete_id: int, active_only: bool = True) -> list:
+    """
+    Get all highlights for an athlete.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    active_only : bool
+        Whether to return only active highlights
+        
+    Returns
+    -------
+    list
+        List of highlights for the athlete
+    """
+    try:
+        with conn:
+            query = """
+                SELECT h.id, h.highlight_text, h.category, h.created_at, 
+                       h.updated_at, h.is_active, h.source_conversation_id,
+                       r.transcription, r.final_response
+                FROM athlete_highlights h
+                LEFT JOIN records r ON h.source_conversation_id = r.id
+                WHERE h.athlete_id = ?
+            """
+            if active_only:
+                query += " AND h.is_active = 1"
+            query += " ORDER BY h.created_at DESC"
+            
+            cursor = conn.execute(query, (athlete_id,))
+            highlights = cursor.fetchall()
+        
+        return [
+            {
+                "id": h[0],
+                "highlight_text": h[1],
+                "category": h[2],
+                "created_at": h[3],
+                "updated_at": h[4],
+                "is_active": bool(h[5]),
+                "source_conversation_id": h[6],
+                "source_transcription": h[7],
+                "source_response": h[8]
+            }
+            for h in highlights
+        ]
+    except Exception as e:
+        return []
+
+
+def update_highlight_status(highlight_id: int, is_active: bool) -> dict:
+    """
+    Update the active status of a highlight.
+    
+    Parameters
+    ----------
+    highlight_id : int
+        ID of the highlight to update
+    is_active : bool
+        Whether the highlight should be active
+        
+    Returns
+    -------
+    dict
+        Result with status
+    """
+    try:
+        with conn:
+            conn.execute(
+                """
+                UPDATE athlete_highlights 
+                SET is_active = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (is_active, highlight_id)
+            )
+        return {
+            "status": "success",
+            "message": "Highlight updated successfully"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error updating highlight: {str(e)}"
+        }
+
+
+def delete_highlight(highlight_id: int) -> dict:
+    """
+    Delete a highlight.
+    
+    Parameters
+    ----------
+    highlight_id : int
+        ID of the highlight to delete
+        
+    Returns
+    -------
+    dict
+        Result with status
+    """
+    try:
+        with conn:
+            conn.execute(
+                "DELETE FROM athlete_highlights WHERE id = ?",
+                (highlight_id,)
+            )
+        return {
+            "status": "success",
+            "message": "Highlight deleted successfully"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error deleting highlight: {str(e)}"
+        }
+
+
+def generate_highlights_from_conversation(
+    athlete_id: int, 
+    conversation_id: int, 
+    transcription: str, 
+    response: str
+) -> dict:
+    """
+    Generate highlights from a conversation using AI.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    conversation_id : int
+        ID of the conversation
+    transcription : str
+        The athlete's message
+    response : str
+        The coach's response
+        
+    Returns
+    -------
+    dict
+        Result with generated highlights
+    """
+    try:
+        # Combine transcription and response for context
+        full_context = f"Athlete: {transcription}\nCoach: {response}"
+        
+        # Use AI to extract key points
+        prompt = f"""Extract the 2-3 most important key points from this conversation between an athlete and coach. 
+        Focus on actionable insights, important decisions, or significant updates.
+        
+        Conversation:
+        {full_context}
+        
+        Return only the key points as a JSON array of strings, like:
+        ["Key point 1", "Key point 2", "Key point 3"]"""
+        
+        # For now, return a simple implementation
+        # In production, this would use the OpenAI API
+        highlights = [
+            f"Conversation about: {transcription[:50]}...",
+            f"Coach response focused on: {response[:50]}..."
+        ]
+        
+        # Add highlights to database
+        added_highlights = []
+        for highlight in highlights:
+            result = add_athlete_highlight(
+                athlete_id=athlete_id,
+                highlight_text=highlight,
+                category="auto-generated",
+                source_conversation_id=conversation_id
+            )
+            if result["status"] == "success":
+                added_highlights.append(result["highlight_id"])
+        
+        return {
+            "status": "success",
+            "highlights": added_highlights,
+            "count": len(added_highlights)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Error generating highlights: {str(e)}"
+        }
+
+
+# API endpoints for athlete highlights
+
+@app.post("/athletes/{athlete_id}/highlights", response_class=JSONResponse)
+async def create_highlight(
+    athlete_id: int,
+    highlight_text: str = Form(...),
+    category: str = Form("general"),
+    source_conversation_id: Optional[int] = Form(None)
+) -> JSONResponse:
+    """
+    Create a new highlight for an athlete.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    highlight_text : str
+        The key point or summary to highlight
+    category : str
+        Category of the highlight
+    source_conversation_id : int, optional
+        ID of the conversation this highlight was derived from
+        
+    Returns
+    -------
+    JSONResponse
+        Result with status and highlight ID
+    """
+    result = add_athlete_highlight(
+        athlete_id=athlete_id,
+        highlight_text=highlight_text,
+        category=category,
+        source_conversation_id=source_conversation_id
+    )
+    return JSONResponse(result)
+
+
+@app.get("/athletes/{athlete_id}/highlights", response_class=JSONResponse)
+async def get_highlights(
+    athlete_id: int,
+    active_only: bool = True
+) -> JSONResponse:
+    """
+    Get all highlights for an athlete.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    active_only : bool
+        Whether to return only active highlights
+        
+    Returns
+    -------
+    JSONResponse
+        List of highlights for the athlete
+    """
+    highlights = get_athlete_highlights(athlete_id, active_only)
+    return JSONResponse({"highlights": highlights})
+
+
+@app.put("/highlights/{highlight_id}", response_class=JSONResponse)
+async def update_highlight(
+    highlight_id: int,
+    is_active: bool = Form(...)
+) -> JSONResponse:
+    """
+    Update the active status of a highlight.
+    
+    Parameters
+    ----------
+    highlight_id : int
+        ID of the highlight to update
+    is_active : bool
+        Whether the highlight should be active
+        
+    Returns
+    -------
+    JSONResponse
+        Result with status
+    """
+    result = update_highlight_status(highlight_id, is_active)
+    return JSONResponse(result)
+
+
+@app.delete("/highlights/{highlight_id}", response_class=JSONResponse)
+async def delete_highlight_endpoint(highlight_id: int) -> JSONResponse:
+    """
+    Delete a highlight.
+    
+    Parameters
+    ----------
+    highlight_id : int
+        ID of the highlight to delete
+        
+    Returns
+    -------
+    JSONResponse
+        Result with status
+    """
+    result = delete_highlight(highlight_id)
+    return JSONResponse(result)
+
+
+@app.post("/athletes/{athlete_id}/highlights/generate", response_class=JSONResponse)
+async def generate_highlights(
+    athlete_id: int,
+    conversation_id: int = Form(...),
+    transcription: str = Form(...),
+    response: str = Form(...)
+) -> JSONResponse:
+    """
+    Generate highlights from a conversation using AI.
+    
+    Parameters
+    ----------
+    athlete_id : int
+        ID of the athlete
+    conversation_id : int
+        ID of the conversation
+    transcription : str
+        The athlete's message
+    response : str
+        The coach's response
+        
+    Returns
+    -------
+    JSONResponse
+        Result with generated highlights
+    """
+    result = generate_highlights_from_conversation(
+        athlete_id=athlete_id,
+        conversation_id=conversation_id,
+        transcription=transcription,
+        response=response
+    )
+    return JSONResponse(result)
