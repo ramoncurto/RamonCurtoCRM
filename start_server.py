@@ -11,6 +11,22 @@ import webbrowser
 import time
 from pathlib import Path
 
+# Load environment variables from .env file
+def load_env_file():
+    """Load environment variables from .env file"""
+    env_file = Path('.env')
+    if env_file.exists():
+        print("📄 Loading environment variables from .env file...")
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    os.environ[key] = value
+        print("✅ Environment variables loaded successfully")
+    else:
+        print("⚠️  No .env file found - using system environment variables")
+
 def check_dependencies():
     """Check if all required dependencies are installed"""
     # Map package names to their import names
@@ -51,8 +67,9 @@ def start_server():
     print("📍 Server will be available at: http://localhost:8000")
     print("\n🔗 Quick Links:")
     print("   Dashboard: http://localhost:8000/dashboard")
-    print("   Athletes: http://localhost:8000/athletes/manage")
+    print("   Athletes: http://localhost:8000/athletes")
     print("   History: http://localhost:8000/history")
+    print("   Communication Hub: http://localhost:8000/communication-hub")
     print("\n⚡ Press Ctrl+C to stop the server\n")
     
     # Wait a moment before opening browser
@@ -82,6 +99,9 @@ def main():
     """Main startup function"""
     print("🏆 Elite Athlete CRM - Advanced Audio Processing System")
     print("=" * 60)
+    
+    # Load environment variables
+    load_env_file()
     
     # Check dependencies
     if not check_dependencies():

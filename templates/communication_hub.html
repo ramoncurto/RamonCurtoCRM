@@ -1,2064 +1,1167 @@
-<!--
-    Elite Athletes • Omnichannel Communication Hub (Integrated Version)
+{% extends "base.html" %}
 
-    This template extends the original prototype from `communication_hub_design.html` and
-    wires it into the existing FastAPI backend. When placed inside your
-    project's `templates` directory and served via a new route (see
-    modifications to `main.py`), the hub will fetch real athlete data,
-    conversation history and highlights from your API endpoints. It also
-    provides a basic mechanism to send new responses which are persisted
-    through the `/save` endpoint. Audio transcription and voice recording
-    remain optional and can be enabled by reusing the existing `/transcribe`
-    and `/generate` endpoints.
+{% block title %}Elite Athletes • Communication Hub{% endblock %}
+{% block page_title %}Communication Hub{% endblock %}
+{% block page_subtitle %}Unified messaging center for all athlete communications{% endblock %}
 
-    To integrate:
-      1. Copy this file into your `templates` folder.
-      2. Add a route in `main.py` such as:
+{% block extra_css %}
+<style>
+    /* Communication Hub specific styles */
+    .communication-hub {
+        display: grid;
+        grid-template-columns: 320px 1fr 380px;
+        height: calc(100vh - 140px);
+        gap: 0;
+        background: var(--bg-primary);
+    }
 
-         @app.get("/communication-hub", response_class=HTMLResponse)
-         async def communication_hub(request: Request) -> HTMLResponse:
-             return templates.TemplateResponse("communication_hub.html", {"request": request})
+    .customer-sidebar {
+        background: var(--bg-secondary);
+        border-right: 1px solid var(--border-primary);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
 
-      3. Add a navigation link to this page in your sidebar templates
-         (e.g. in `dashboard.html` and `history.html`) so it can be
-         accessed from the UI.
+    .customer-header {
+        padding: var(--space-6);
+        border-bottom: 1px solid var(--border-primary);
+    }
 
-      4. Ensure the `/athletes`, `/athletes/{id}`, `/athletes/{id}/history`,
-         `/athletes/{id}/highlights` and `/save` endpoints remain
-         functional. Optional features such as `/transcribe` and
-         `/generate` can be plugged into the voice and AI tools if desired.
+    .customer-profile {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+    }
 
-    Author: ChatGPT
-    Date: 2025-07-28
--->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Elite CRM • Omnichannel Communication Hub</title>
-    <!-- Font Awesome icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <style>
-        /*
-            Most of the styling here is derived from the original design and
-            matches the colour palette used throughout the CRM dashboard. Feel
-            free to tweak these variables to align with your brand.
-        */
-        :root {
-            /* Brand Colours */
-            --primary-500: #6366f1;
-            --primary-600: #4f46e5;
-            --primary-700: #4338ca;
-            --secondary-500: #8b5cf6;
-            --secondary-600: #7c3aed;
-            
-            /* Platform Colours */
-            --whatsapp: #25d366;
-            --telegram: #0088cc;
-            --sms: #007aff;
-            --email: #ea4335;
-            --phone: #34a853;
-            
-            /* Semantic Colours */
-            --success-50: #ecfdf5;
-            --success-500: #10b981;
-            --success-600: #059669;
-            --warning-50: #fffbeb;
-            --warning-500: #f59e0b;
-            --warning-600: #d97706;
-            --error-50: #fef2f2;
-            --error-500: #ef4444;
-            --error-600: #dc2626;
-            --info-50: #eff6ff;
-            --info-500: #3b82f6;
-            --info-600: #2563eb;
-            
-            /* Status Colours */
-            --online: #10b981;
-            --away: #f59e0b;
-            --busy: #ef4444;
-            --offline: #6b7280;
-            
-            /* Dark Theme */
-            --bg-primary: #0a0e1a;
-            --bg-secondary: #111827;
-            --bg-tertiary: #1f2937;
-            --bg-surface: #374151;
-            --bg-overlay: rgba(17, 24, 39, 0.8);
-            --bg-chat: #0f172a;
-            
-            /* Text Colours */
-            --text-primary: #f9fafb;
-            --text-secondary: #d1d5db;
-            --text-tertiary: #9ca3af;
-            --text-quaternary: #6b7280;
-            
-            /* Borders */
-            --border-primary: #374151;
-            --border-secondary: #4b5563;
-            --border-focus: var(--primary-500);
-            
-            /* Shadows */
-            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-            
-            /* Spacing */
-            --space-1: 0.25rem;
-            --space-2: 0.5rem;
-            --space-3: 0.75rem;
-            --space-4: 1rem;
-            --space-5: 1.25rem;
-            --space-6: 1.5rem;
-            --space-8: 2rem;
-            --space-10: 2.5rem;
-            --space-12: 3rem;
-            --space-16: 4rem;
-            
-            /* Border Radius */
-            --radius-sm: 0.25rem;
-            --radius-md: 0.375rem;
-            --radius-lg: 0.5rem;
-            --radius-xl: 0.75rem;
-            --radius-2xl: 1rem;
-            --radius-3xl: 1.5rem;
-            
-            /* Transitions */
-            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
-        }
+    .customer-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+        color: white;
+        font-weight: 600;
+        font-size: 1.125rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.5;
-        }
-        /* Main Layout */
+    .status-indicator {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        border: 2px solid var(--bg-secondary);
+        animation: pulse 2s infinite;
+    }
+
+    .status-indicator.online {
+        background: var(--online);
+    }
+
+    .status-indicator.away {
+        background: var(--away);
+    }
+
+    .status-indicator.busy {
+        background: var(--busy);
+    }
+
+    .status-indicator.offline {
+        background: var(--offline);
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .customer-info h3 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: var(--space-1);
+    }
+
+    .customer-status {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .platform-indicators {
+        display: flex;
+        gap: var(--space-4);
+        margin-top: var(--space-4);
+    }
+
+    .platform-status {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: 0.875rem;
+        color: var(--text-tertiary);
+    }
+
+    .platform-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+
+    .platform-status.whatsapp .platform-dot { background: var(--whatsapp); }
+    .platform-status.telegram .platform-dot { background: var(--telegram); }
+    .platform-status.email .platform-dot { background: var(--email); }
+    .platform-status.sms .platform-dot { background: var(--sms); }
+    .platform-status.phone .platform-dot { background: var(--phone); }
+
+    .timeline-section {
+        padding: var(--space-6);
+        flex: 1;
+        overflow-y: auto;
+    }
+
+    .timeline-header {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: var(--space-4);
+    }
+
+    .timeline-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: 600;
+        margin-bottom: var(--space-2);
+        color: var(--text-primary);
+    }
+
+    .timeline-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-2);
+    }
+
+    .filter-btn {
+        padding: 0.25rem 0.75rem;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border-primary);
+        background: var(--bg-tertiary);
+        color: var(--text-tertiary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .filter-btn:hover {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+    }
+
+    .filter-btn.active {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: var(--space-6);
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-primary);
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: var(--space-4);
+        padding: var(--space-4);
+        background: var(--bg-secondary);
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--border-primary);
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .timeline-item:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--primary-500);
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -23px;
+        top: 20px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--primary-500);
+        border: 2px solid var(--bg-secondary);
+    }
+
+    .timeline-item.whatsapp::before { background: var(--whatsapp); }
+    .timeline-item.telegram::before { background: var(--telegram); }
+    .timeline-item.email::before { background: var(--email); }
+    .timeline-item.sms::before { background: var(--sms); }
+    .timeline-item.phone::before { background: var(--phone); }
+
+    .timeline-item-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--space-2);
+    }
+
+    .timeline-platform {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .timeline-platform.whatsapp { color: var(--whatsapp); }
+    .timeline-platform.telegram { color: var(--telegram); }
+    .timeline-platform.email { color: var(--email); }
+    .timeline-platform.sms { color: var(--sms); }
+    .timeline-platform.phone { color: var(--phone); }
+
+    .timeline-time {
+        font-size: 0.75rem;
+        color: var(--text-quaternary);
+    }
+
+    .timeline-content {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    .unified-chat {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-chat);
+        border-right: 1px solid var(--border-primary);
+    }
+
+    .chat-header {
+        padding: var(--space-6);
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: var(--bg-secondary);
+    }
+
+    .chat-info {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+    }
+
+    .omnichannel-icon {
+        width: 48px;
+        height: 48px;
+        background: var(--primary-500);
+        border-radius: var(--radius-lg);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.25rem;
+    }
+
+    .chat-title {
+        font-weight: 600;
+        font-size: 1.125rem;
+        color: var(--text-primary);
+    }
+
+    .chat-subtitle {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .chat-actions {
+        display: flex;
+        gap: var(--space-2);
+    }
+
+    .chat-action-btn {
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--border-primary);
+        border-radius: var(--radius-md);
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .chat-action-btn:hover {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+    }
+
+    .unified-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-6);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-4);
+    }
+
+    .message {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.whatsapp .message-bubble { background: #073b14; }
+    .message.telegram .message-bubble { background: #021e36; }
+    .message.email .message-bubble { background: #240404; }
+    .message.sms .message-bubble { background: #0b1b38; }
+    .message.phone .message-bubble { background: #032b06; }
+
+    .message-content {
+        display: flex;
+        flex-direction: column;
+        max-width: 70%;
+    }
+
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+        color: white;
+        font-weight: 600;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .message-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        margin-bottom: var(--space-1);
+    }
+
+    .message-sender {
+        font-weight: 600;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .message-platform {
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .message.whatsapp .message-platform { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+    .message.telegram .message-platform { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+    .message.email .message-platform { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+    .message.sms .message-platform { background: rgba(0, 122, 255, 0.2); color: var(--sms); }
+    .message.phone .message-platform { background: rgba(52, 168, 83, 0.2); color: var(--phone); }
+
+    .message-time {
+        font-size: 0.75rem;
+        color: var(--text-quaternary);
+    }
+
+    .message-bubble {
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-lg);
+        color: white;
+        font-size: 0.875rem;
+        line-height: 1.4;
+    }
+
+    .message-input-area {
+        padding: var(--space-6);
+        border-top: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+    }
+
+    .message-input-container {
+        display: flex;
+        gap: var(--space-3);
+        align-items: flex-end;
+    }
+
+    .message-input {
+        flex: 1;
+        padding: var(--space-3) var(--space-4);
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: var(--radius-lg);
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        resize: none;
+        min-height: 44px;
+        max-height: 120px;
+        transition: border-color var(--transition-fast);
+    }
+
+    .message-input:focus {
+        outline: none;
+        border-color: var(--primary-500);
+    }
+
+    .send-btn {
+        padding: var(--space-3) var(--space-4);
+        background: var(--primary-500);
+        color: white;
+        border: none;
+        border-radius: var(--radius-lg);
+        font-weight: 600;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+    }
+
+    .send-btn:hover {
+        background: var(--primary-600);
+        transform: translateY(-1px);
+    }
+
+    .send-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .highlights-sidebar {
+        background: var(--bg-secondary);
+        border-left: 1px solid var(--border-primary);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .highlights-header {
+        padding: var(--space-6);
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .highlights-title {
+        display: flex;
+        align-items: center;
+        gap: var(--space-2);
+        font-weight: 600;
+        margin-bottom: var(--space-2);
+        color: var(--text-primary);
+    }
+
+    .highlights-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+    }
+
+    .highlights-tabs {
+        display: flex;
+        gap: var(--space-1);
+        margin-top: var(--space-4);
+    }
+
+    .highlight-tab {
+        padding: var(--space-2) var(--space-3);
+        border: 1px solid var(--border-primary);
+        border-radius: var(--radius-md);
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all var(--transition-fast);
+    }
+
+    .highlight-tab:hover {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+    }
+
+    .highlight-tab.active {
+        background: var(--primary-500);
+        color: white;
+        border-color: var(--primary-500);
+    }
+
+    .highlights-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: var(--space-6);
+    }
+
+    .highlight-item {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--space-3);
+        background: var(--bg-tertiary);
+        padding: var(--space-4);
+        border-radius: var(--radius-lg);
+        border: 1px solid transparent;
+        cursor: default;
+        margin-bottom: var(--space-3);
+        transition: all var(--transition-fast);
+    }
+
+    .highlight-item:hover {
+        border-color: var(--primary-500);
+        background: var(--bg-surface);
+    }
+
+    .highlight-bullet {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 0.25rem;
+        flex-shrink: 0;
+    }
+
+    .highlight-item.nutrition .highlight-bullet { background: var(--whatsapp); }
+    .highlight-item.achievement .highlight-bullet { background: var(--telegram); }
+    .highlight-item.question .highlight-bullet { background: var(--email); }
+    .highlight-item.concern .highlight-bullet { background: var(--phone); }
+
+    .highlight-content {
+        flex: 1;
+    }
+
+    .highlight-text {
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        line-height: 1.4;
+        margin-bottom: var(--space-2);
+    }
+
+    .highlight-meta {
+        display: flex;
+        align-items: center;
+        gap: var(--space-3);
+        font-size: 0.75rem;
+        color: var(--text-quaternary);
+    }
+
+    .highlight-category {
+        padding: 0.125rem 0.375rem;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.625rem;
+    }
+
+    .highlight-item.nutrition .highlight-category { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+    .highlight-item.achievement .highlight-category { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+    .highlight-item.question .highlight-category { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+    .highlight-item.concern .highlight-category { background: rgba(52, 168, 83, 0.2); color: var(--phone); }
+
+    /* Responsive Design */
+    @media (max-width: 1400px) {
         .communication-hub {
-            display: grid;
-            grid-template-columns: 320px 1fr 380px;
-            grid-template-rows: 100vh;
-            height: 100vh;
+            grid-template-columns: 300px 1fr 350px;
         }
+    }
 
-        /* Left Sidebar - Customer & Timeline */
+    @media (max-width: 1200px) {
+        .communication-hub {
+            grid-template-columns: 280px 1fr 320px;
+        }
+    }
+
+    @media (max-width: 1024px) {
+        .communication-hub {
+            grid-template-columns: 1fr 300px;
+        }
+        
         .customer-sidebar {
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-primary);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            display: none;
         }
+    }
 
-        /* Unified Chat Area */
-        .unified-chat {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-chat);
+    @media (max-width: 768px) {
+        .communication-hub {
+            grid-template-columns: 1fr;
         }
-
-        /* Right Sidebar - Highlights & AI */
+        
         .highlights-sidebar {
-            background: var(--bg-secondary);
-            border-left: 1px solid var(--border-primary);
-            display: flex;
-            flex-direction: column;
-        }
-        /* Customer Header */
-        .customer-header {
-            padding: var(--space-6);
-            border-bottom: 1px solid var(--border-primary);
-            background: var(--bg-tertiary);
-        }
-
-        .customer-profile {
-            display: flex;
-            align-items: center;
-            gap: var(--space-4);
-            margin-bottom: var(--space-4);
-        }
-
-        .customer-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: white;
-            position: relative;
-        }
-
-        .status-indicator {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 2px solid var(--bg-tertiary);
-            background: var(--online);
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .customer-info h2 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: var(--space-1);
-        }
-
-        .customer-details {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-
-        .tier-badge {
-            padding: 0.125rem 0.5rem;
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            background: rgba(251, 191, 36, 0.2);
-            color: #fbbf24;
-            border: 1px solid #fbbf24;
-        }
-        .platform-indicators {
-            display: flex;
-            gap: var(--space-2);
-            margin-top: var(--space-4);
-        }
-
-        .platform-status {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            padding: var(--space-2) var(--space-3);
-            background: var(--bg-secondary);
-            border-radius: var(--radius-lg);
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .platform-status.whatsapp {
-            color: var(--whatsapp);
-            background: rgba(37, 211, 102, 0.1);
-        }
-
-        .platform-status.telegram {
-            color: var(--telegram);
-            background: rgba(0, 136, 204, 0.1);
-        }
-
-        .platform-status.email {
-            color: var(--email);
-            background: rgba(234, 67, 53, 0.1);
-        }
-
-        .platform-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: currentColor;
-            animation: pulse 2s infinite;
-        }
-
-        /* Conversation Timeline */
-        .timeline-section {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .timeline-header {
-            padding: var(--space-4);
-            border-bottom: 1px solid var(--border-primary);
-            background: var(--bg-tertiary);
-        }
-
-        .timeline-title {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: var(--space-3);
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-        }
-
-        .timeline-filters {
-            display: flex;
-            gap: var(--space-2);
-            flex-wrap: wrap;
-        }
-
-        .filter-btn {
-            padding: var(--space-1) var(--space-3);
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 9999px;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .filter-btn:hover {
-            background: var(--bg-surface);
-            color: var(--text-primary);
-        }
-
-        .filter-btn.active {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
-        }
-
-        .timeline-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: var(--space-4);
-        }
-
-        .timeline {
-            position: relative;
-            padding-left: var(--space-6);
-        }
-
-        .timeline::before {
-            content: '';
-            position: absolute;
-            left: 8px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: var(--border-primary);
-        }
-
-        .timeline-item {
-            position: relative;
-            padding-bottom: var(--space-4);
-            margin-bottom: var(--space-4);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-        }
-
-        .timeline-item:hover {
-            transform: translateX(2px);
-        }
-
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -6px;
-            top: 8px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: var(--primary-500);
-            border: 2px solid var(--bg-tertiary);
-            z-index: 1;
-        }
-
-        .timeline-item.whatsapp::before { background: var(--whatsapp); }
-        .timeline-item.telegram::before { background: var(--telegram); }
-        .timeline-item.email::before { background: var(--email); }
-        .timeline-item.phone::before { background: var(--phone); }
-
-        .timeline-content-item {
-            background: var(--bg-tertiary);
-            padding: var(--space-4);
-            border-radius: var(--radius-xl);
-            margin-left: var(--space-4);
-            transition: all var(--transition-fast);
-        }
-
-        .timeline-content-item:hover {
-            background: var(--bg-surface);
-            box-shadow: var(--shadow-md);
-        }
-
-        .timeline-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: var(--space-2);
-        }
-
-        .timeline-platform {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: var(--space-1) var(--space-2);
-            border-radius: 9999px;
-        }
-
-        .timeline-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
-        .timeline-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
-        .timeline-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
-        .timeline-platform.phone { background: rgba(52, 168, 83, 0.2); color: var(--phone); }
-
-        .timeline-date {
-            font-size: 0.75rem;
-            color: var(--text-quaternary);
-        }
-
-        .timeline-message {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-            margin-bottom: var(--space-2);
-        }
-
-        /* Chat Header */
-        .chat-header {
-            padding: var(--space-4) var(--space-6);
-            border-bottom: 1px solid var(--border-primary);
-            background: var(--bg-secondary);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .chat-info {
-            display: flex;
-            align-items: center;
-            gap: var(--space-4);
-        }
-
-        .omnichannel-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.125rem;
-        }
-
-        .chat-title {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .chat-subtitle {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
-        .live-indicator {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            padding: var(--space-2) var(--space-3);
-            background: rgba(16, 185, 129, 0.1);
-            color: var(--success-500);
-            border-radius: 9999px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .live-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--success-500);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        /* Unified Messages */
-        .unified-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: var(--space-6);
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-4);
-        }
-
-        .message {
-            display: flex;
-            gap: var(--space-3);
-            max-width: 75%;
-        }
-
-        .message.sent {
-            align-self: flex-end;
-            flex-direction: row-reverse;
-        }
-
-        .message-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: white;
-            flex-shrink: 0;
-        }
-
-        .message.sent .message-avatar {
-            background: var(--bg-surface);
-        }
-
-        .message-content {
-            flex: 1;
-        }
-
-        .message-header {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            margin-bottom: var(--space-2);
-        }
-
-        .message-sender {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .message-platform {
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.125rem 0.375rem;
-            border-radius: 9999px;
-        }
-
-        .message-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
-        .message-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
-        .message-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
-
-        .message-time {
-            font-size: 0.75rem;
-            color: var(--text-quaternary);
-        }
-
-        .message-bubble {
-            padding: var(--space-4);
-            border-radius: var(--radius-xl);
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            color: var(--text-primary);
-            line-height: 1.5;
-            position: relative;
-        }
-
-        .message.sent .message-bubble {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
-        }
-
-        .message.whatsapp .message-avatar {
-            background: var(--whatsapp);
-        }
-
-        .message.telegram .message-avatar {
-            background: var(--telegram);
-        }
-
-        .message.email .message-avatar {
-            background: var(--email);
-        }
-        /* Response area */
-        .response-area {
-            border-top: 1px solid var(--border-primary);
-            padding: var(--space-6);
-            background: var(--bg-tertiary);
-        }
-        .platform-selector {
-            margin-bottom: var(--space-4);
-        }
-        .selector-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: var(--space-2);
-        }
-        .platform-options {
-            display: flex;
-            gap: var(--space-2);
-        }
-        .platform-option {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius-md);
-            font-size: 0.875rem;
-            cursor: pointer;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            color: var(--text-secondary);
-        }
-        .platform-option.active {
-            border-color: var(--primary-500);
-            background: var(--primary-500);
-            color: white;
-        }
-        /* Input tools */
-        .input-tools {
-            display: flex;
-            gap: var(--space-2);
-            margin-bottom: var(--space-2);
-        }
-        .tool-btn {
-            display: flex;
-            align-items: center;
-            gap: var(--space-1);
-            padding: 0.5rem 0.75rem;
-            border-radius: var(--radius-md);
-            font-size: 0.75rem;
-            border: 1px solid var(--border-primary);
-            background: var(--bg-tertiary);
-            color: var(--text-secondary);
-            cursor: pointer;
-        }
-        .tool-btn.active {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
-        }
-        .voice-recording {
             display: none;
-            align-items: center;
-            gap: var(--space-2);
-            background: var(--bg-chat);
-            border: 1px solid var(--border-primary);
-            padding: var(--space-2);
-            border-radius: var(--radius-lg);
-            margin-bottom: var(--space-2);
         }
-        .recording-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--error-500);
-            animation: blink 1s linear infinite;
-        }
-        @keyframes blink { 50% { opacity: 0; } }
-        .recording-time { font-size: 0.75rem; color: var(--text-tertiary); }
-        .recording-controls {
-            display: flex;
-            gap: var(--space-2);
-        }
-        .recording-btn {
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            padding: 0.25rem 0.5rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-        }
-        .recording-btn.stop { color: var(--error-500); }
-        /* Email fields */
-        .email-fields {
-            display: none;
-            margin-bottom: var(--space-2);
-        }
-        .email-subject {
-            width: 100%;
-            padding: var(--space-3);
-            background: var(--bg-chat);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-        }
-        /* Input area */
-        .input-container {
-            display: flex;
-            position: relative;
-        }
-        .response-textarea {
-            flex: 1;
-            padding: var(--space-4);
-            background: var(--bg-chat);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-lg);
-            color: var(--text-primary);
-            resize: vertical;
-            min-height: 3rem;
-            font-size: 0.875rem;
-        }
-        .input-actions {
-            position: absolute;
-            right: var(--space-3);
-            bottom: var(--space-3);
-            display: flex;
-            gap: var(--space-2);
-        }
-        .input-btn {
-            background: transparent;
-            border: none;
-            color: var(--primary-500);
-            font-size: 1rem;
-            cursor: pointer;
-        }
-        .input-btn.send-btn {
-            color: var(--primary-600);
-        }
-        /* Highlights sidebar */
-        .highlights-header {
-            padding: var(--space-6);
-            border-bottom: 1px solid var(--border-primary);
-        }
-        .highlights-title {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: var(--space-1);
-        }
-        .highlights-subtitle {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
+    }
+</style>
+{% endblock %}
 
-        .highlights-tabs {
-            display: flex;
-            gap: var(--space-1);
-            margin-top: var(--space-4);
-        }
-
-        .highlight-tab {
-            padding: var(--space-2) var(--space-3);
-            background: transparent;
-            border: 1px solid transparent;
-            border-radius: var(--radius-lg);
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all var(--transition-fast);
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
-
-        .highlight-tab:hover {
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-        }
-
-        .highlight-tab.active {
-            background: var(--primary-500);
-            color: white;
-            border-color: var(--primary-500);
-        }
-
-        .highlights-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: var(--space-6);
-        }
-        /* Compact Keynote‑style Highlights */
-        .highlight-item {
-            padding: var(--space-2) var(--space-3);
-            background: var(--bg-tertiary);
-            border-radius: var(--radius-md);
-            margin-bottom: var(--space-2);
-            transition: all var(--transition-fast);
-            cursor: pointer;
-            position: relative;
-            border-left: 2px solid var(--primary-500);
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            min-height: 40px;
-        }
-
-        .highlight-item:hover {
-            background: var(--bg-surface);
-            transform: translateX(1px);
-        }
-
-        .highlight-bullet {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--primary-500);
-            flex-shrink: 0;
-        }
-
-        .highlight-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .highlight-text {
-            font-size: 0.8rem;
-            color: var(--text-primary);
-            line-height: 1.2;
-            font-weight: 500;
-            margin: 0;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .highlight-meta {
-            display: flex;
-            align-items: center;
-            gap: var(--space-2);
-            margin-left: auto;
-            flex-shrink: 0;
-        }
-
-        .highlight-category {
-            font-size: 0.65rem;
-            font-weight: 700;
-            padding: 0.125rem 0.375rem;
-            border-radius: 9999px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            background: rgba(99, 102, 241, 0.15);
-            color: var(--primary-500);
-        }
-
-        .highlight-time {
-            font-size: 0.65rem;
-            color: var(--text-quaternary);
-            font-weight: 500;
-        }
-
-        /* Category‑specific colours */
-        .highlight-item.nutrition {
-            border-left-color: var(--warning-500);
-        }
-
-        .highlight-item.nutrition .highlight-bullet {
-            background: var(--warning-500);
-        }
-
-        .highlight-item.nutrition .highlight-category {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--warning-500);
-        }
-
-        .highlight-item.achievement {
-            border-left-color: var(--success-500);
-        }
-
-        .highlight-item.achievement .highlight-bullet {
-            background: var(--success-500);
-        }
-
-        .highlight-item.achievement .highlight-category {
-            background: rgba(16, 185, 129, 0.15);
-            color: var(--success-500);
-        }
-
-        .highlight-item.question {
-            border-left-color: var(--info-500);
-        }
-
-        .highlight-item.question .highlight-bullet {
-            background: var(--info-500);
-        }
-
-        .highlight-item.question .highlight-category {
-            background: rgba(59, 130, 246, 0.15);
-            color: var(--info-500);
-        }
-
-        .highlight-item.concern {
-            border-left-color: var(--error-500);
-        }
-
-        .highlight-item.concern .highlight-bullet {
-            background: var(--error-500);
-        }
-
-        .highlight-item.concern .highlight-category {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--error-500);
-        }
-        .ai-highlight-suggestion {
-            background: var(--bg-tertiary);
-            padding: var(--space-4);
-            border-radius: var(--radius-lg);
-            border: 1px solid var(--border-primary);
-        }
-        .ai-suggestion-header {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            margin-bottom: var(--space-2);
-        }
-        .ai-suggestion-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: var(--radius-sm);
-            background: var(--primary-500);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 0.875rem;
-        }
-        .ai-suggestion-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-        .ai-suggestion-text {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-            margin-bottom: var(--space-3);
-        }
-        .ai-suggestion-actions {
-            display: flex;
-            gap: var(--space-2);
-        }
-        .ai-suggestion-btn {
-            padding: 0.25rem 0.75rem;
-            font-size: 0.75rem;
-            border-radius: var(--radius-md);
-            cursor: pointer;
-            border: 1px solid var(--primary-500);
-            background: var(--primary-500);
-            color: white;
-        }
-        .ai-suggestion-btn.secondary {
-            background: transparent;
-            color: var(--primary-500);
-        }
-        /* Notification */
-        .auto-highlight-notification {
-            position: fixed;
-            bottom: var(--space-6);
-            right: var(--space-6);
-            background: var(--primary-500);
-            color: white;
-            padding: var(--space-4);
-            border-radius: var(--radius-lg);
-            display: none;
-            box-shadow: var(--shadow-lg);
-            z-index: 100;
-        }
-        
-        /* Dynamic notifications */
-        .notification {
-            position: fixed;
-            top: var(--space-6);
-            right: var(--space-6);
-            background: var(--bg-surface);
-            color: var(--text-primary);
-            padding: var(--space-4);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-lg);
-            z-index: 1000;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-            border-left: 4px solid var(--primary-500);
-            min-width: 300px;
-        }
-        
-        .notification.show {
-            transform: translateX(0);
-        }
-        
-        .notification.success {
-            border-left-color: var(--success-500);
-        }
-        
-        .notification.error {
-            border-left-color: var(--error-500);
-        }
-        
-        .notification.info {
-            border-left-color: var(--info-500);
-        }
-        
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--bg-overlay);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-        }
-        
-        .modal-overlay.show {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: var(--bg-surface);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-xl);
-            width: 90%;
-            max-width: 500px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: var(--space-4);
-            border-bottom: 1px solid var(--border-primary);
-        }
-        
-        .modal-header h3 {
-            margin: 0;
-            color: var(--text-primary);
-        }
-        
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: var(--space-2);
-            border-radius: var(--radius-md);
-            transition: all 0.2s ease;
-        }
-        
-        .modal-close:hover {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-        
-        .modal-body {
-            padding: var(--space-4);
-        }
-        
-        .form-group {
-            margin-bottom: var(--space-4);
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: var(--space-2);
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-        
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: var(--space-3);
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            border-radius: var(--radius-md);
-            color: var(--text-primary);
-            font-size: 0.875rem;
-            transition: border-color 0.2s ease;
-        }
-        
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--primary-500);
-        }
-        
-        .form-actions {
-            display: flex;
-            gap: var(--space-3);
-            justify-content: flex-end;
-            margin-top: var(--space-4);
-        }
-        
-        .btn-primary,
-        .btn-secondary {
-            padding: var(--space-3) var(--space-4);
-            border-radius: var(--radius-md);
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border: none;
-        }
-        
-        .btn-primary {
-            background: var(--primary-500);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: var(--primary-600);
-        }
-        
-        .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-        
-        .btn-secondary:hover {
-            background: var(--bg-overlay);
-        }
-        
-        .notification-content {
-            display: flex;
-            align-items: center;
-            gap: var(--space-3);
-        }
-        .notification-icon {
-            font-size: 1.25rem;
-        }
-        .notification-title {
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-        .notification-description {
-            font-size: 0.75rem;
-        }
-        /* Responsive Design */
-        @media (max-width: 1400px) {
-            .communication-hub {
-                grid-template-columns: 300px 1fr 350px;
-            }
-        }
-
-        @media (max-width: 1200px) {
-            .communication-hub {
-                grid-template-columns: 280px 1fr 320px;
-            }
-        }
-
-        @media (max-width: 1024px) {
-            .communication-hub {
-                grid-template-columns: 1fr 300px;
-            }
-            
-            .customer-sidebar {
-                display: none;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .communication-hub {
-                grid-template-columns: 1fr;
-            }
-            
-            .highlights-sidebar {
-                display: none;
-            }
-        }
-
-        /* Animations */
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        .animate-slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-
-        .animate-highlight {
-            animation: highlightFlash 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(10px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        @keyframes highlightFlash {
-            0% { background: rgba(99, 102, 241, 0.3); }
-            100% { background: var(--bg-tertiary); }
-        }
-    </style>
-</head>
-<body>
-    <div class="communication-hub">
-        <!-- Customer / athlete sidebar -->
-        <div class="customer-sidebar">
-            <div class="customer-header">
-                <div class="customer-profile">
-                    <div class="customer-avatar" id="customerAvatar">AA
-                        <div class="status-indicator" id="customerStatus"></div>
-                    </div>
-                    <div class="customer-info">
-                        <h2 id="customerName">Athlete Name</h2>
-                        <div class="customer-details">
-                            <span class="tier-badge" id="customerTier">Level</span>
-                            <span id="customerSport">Sport</span>
-                        </div>
-                    </div>
+{% block content %}
+<div class="communication-hub">
+    <!-- Customer Sidebar -->
+    <div class="customer-sidebar">
+        <div class="customer-header">
+            <div class="customer-profile">
+                <div class="customer-avatar">
+                    <span>MJ</span>
+                    <div class="status-indicator online"></div>
                 </div>
-                <div class="platform-indicators">
-                    <!-- Dynamically populated with available platforms for this athlete -->
+                <div class="customer-info">
+                    <h3>Michael Johnson</h3>
+                    <div class="customer-status">
+                        <span class="status-dot online"></span>
+                        Online • Elite Athlete
+                    </div>
                 </div>
             </div>
-            <div class="timeline-section">
-                <div class="timeline-header">
-                    <div class="timeline-title">
-                        <i class="fas fa-history"></i>
-                        All Conversations
-                    </div>
-                    
-                    <div class="timeline-filters">
-                        <button class="filter-btn active" onclick="filterTimeline('all')">All</button>
-                        <button class="filter-btn" onclick="filterTimeline('today')">Today</button>
-                        <button class="filter-btn" onclick="filterTimeline('week')">Week</button>
-                        <button class="filter-btn" onclick="filterTimeline('whatsapp')">WhatsApp</button>
-                        <button class="filter-btn" onclick="filterTimeline('telegram')">Telegram</button>
-                        <button class="filter-btn" onclick="filterTimeline('email')">Email</button>
-                    </div>
+            
+            <div class="platform-indicators">
+                <div class="platform-status whatsapp">
+                    <div class="platform-dot"></div>
+                    <span>WhatsApp</span>
                 </div>
-
-                <div class="timeline-content">
-                    <div class="timeline" id="timelineList">
-                        <!-- Timeline items will be injected here -->
-                    </div>
+                <div class="platform-status telegram">
+                    <div class="platform-dot"></div>
+                    <span>Telegram</span>
+                </div>
+                <div class="platform-status email">
+                    <div class="platform-dot"></div>
+                    <span>Email</span>
                 </div>
             </div>
         </div>
-        <!-- Unified chat area -->
-        <div class="unified-chat">
-            <div class="chat-header">
-                <div class="chat-info">
-                    <div class="omnichannel-icon">
-                        <i class="fas fa-comments"></i>
-                    </div>
-                    <div>
-                        <div class="chat-title">Omnichannel Conversation</div>
-                        <div class="chat-subtitle">All platforms in one view</div>
-                    </div>
+        
+        <div class="timeline-section">
+            <div class="timeline-header">
+                <div class="timeline-title">
+                    <i class="fas fa-history"></i>
+                    All Conversations
                 </div>
-                <div class="live-indicator">
-                    <div class="live-dot"></div>
-                    <span>Live</span>
+                <div class="timeline-filters">
+                    <button class="filter-btn active" onclick="filterTimeline('all')">All</button>
+                    <button class="filter-btn" onclick="filterTimeline('today')">Today</button>
+                    <button class="filter-btn" onclick="filterTimeline('week')">Week</button>
                 </div>
             </div>
-            <div class="unified-messages" id="unifiedMessages">
-                <!-- Messages will be injected here -->
-            </div>
-            <div class="response-area">
-                <div class="platform-selector">
-                    <div class="selector-title">Choose Response Platform</div>
-                    <div class="platform-options">
-                        <button class="platform-option whatsapp active" onclick="selectResponsePlatform('whatsapp')" id="whatsappOption">
-                            <i class="fab fa-whatsapp"></i><span>WhatsApp</span>
-                        </button>
-                        <button class="platform-option telegram" onclick="selectResponsePlatform('telegram')" id="telegramOption">
-                            <i class="fab fa-telegram-plane"></i><span>Telegram</span>
-                        </button>
-                        <button class="platform-option email" onclick="selectResponsePlatform('email')" id="emailOption">
-                            <i class="fas fa-envelope"></i><span>Email</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="response-input">
-                    <div class="input-tools">
-                        <button class="tool-btn active" onclick="toggleAI()" id="aiToggle">
-                            <i class="fas fa-robot"></i> AI Assist
-                        </button>
-                        <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceRecording()">
-                            <i class="fas fa-microphone"></i> Voice
-                        </button>
-                        <button class="tool-btn" onclick="loadTemplate()">
-                            <i class="fas fa-file-alt"></i> Templates
-                        </button>
-                        <button class="tool-btn" onclick="addEmoji()">
-                            <i class="fas fa-smile"></i> Emoji
-                        </button>
-                        <button class="tool-btn" onclick="translateText()">
-                            <i class="fas fa-language"></i> Translate
-                        </button>
-                        <button class="tool-btn" onclick="extractHighlights()">
-                            <i class="fas fa-highlighter"></i> Extract Highlights
-                        </button>
-                    </div>
-                    <div class="voice-recording" id="voiceRecording">
-                        <div class="recording-indicator"></div>
-                        <span>Recording...</span>
-                        <div class="recording-time" id="recordingTime">00:00</div>
-                        <div class="recording-controls">
-                            <button class="recording-btn" onclick="pauseRecording()">
-                                <i class="fas fa-pause"></i>
-                            </button>
-                            <button class="recording-btn stop" onclick="stopRecording()">
-                                <i class="fas fa-stop"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="email-fields" id="emailFields">
-                        <input type="text" class="email-subject" placeholder="Email Subject" id="emailSubject">
-                    </div>
-                    <div class="input-container">
-                        <textarea class="response-textarea" id="responseInput" placeholder="Type your response..." rows="4" onkeydown="handleKeyPress(event)" oninput="handleInputChange()"></textarea>
-                        <div class="input-actions">
-                            <button class="input-btn" title="Attach File" onclick="attachFile()">
-                                <i class="fas fa-paperclip"></i>
-                            </button>
-                            <button class="input-btn" id="recordBtn" title="Voice Message" onclick="toggleVoiceRecording()">
-                                <i class="fas fa-microphone"></i>
-                            </button>
-                            <button class="input-btn send-btn" title="Send Message" onclick="sendResponse()">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Highlights sidebar -->
-        <div class="highlights-sidebar">
-            <div class="highlights-header">
-                <div class="highlights-title">
-                    <i class="fas fa-highlighter"></i>
-                    Conversation Highlights
-                </div>
-                <p class="highlights-subtitle">Auto-extracted insights & key points</p>
-                
-                <div class="highlights-tabs">
-                    <button class="highlight-tab active" onclick="switchHighlightTab('auto')">Auto</button>
-                    <button class="highlight-tab" onclick="switchHighlightTab('manual')">Manual</button>
-                    <button class="highlight-tab" onclick="switchHighlightTab('ai')">AI Suggest</button>
-                </div>
-            </div>
-
-            <div class="highlights-content" id="highlightsContent">
-                <!-- Highlight items injected here -->
+            <div class="timeline" id="timelineList">
+                <!-- Timeline items will be injected here -->
             </div>
         </div>
     </div>
-    <!-- Notification for highlights extraction -->
-    <div class="auto-highlight-notification" id="highlightNotification">
-        <div class="notification-content">
-            <div class="notification-icon"><i class="fas fa-highlighter"></i></div>
-            <div class="notification-body">
-                <div class="notification-title">New Highlight Extracted</div>
-                <div class="notification-description">AI found a new key point</div>
+
+    <!-- Unified Chat Area -->
+    <div class="unified-chat">
+        <div class="chat-header">
+            <div class="chat-info">
+                <div class="omnichannel-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <div>
+                    <div class="chat-title">Unified Conversation</div>
+                    <div class="chat-subtitle">All platforms in one view</div>
+                </div>
             </div>
-        </div>
-    </div>
-    
-    <!-- Manual Highlight Modal -->
-    <div class="modal-overlay" id="highlightModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">Create Manual Highlight</h3>
-                <button class="modal-close" onclick="closeHighlightModal()">
-                    <i class="fas fa-times"></i>
+            <div class="chat-actions">
+                <button class="chat-action-btn">
+                    <i class="fas fa-phone"></i>
+                </button>
+                <button class="chat-action-btn">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button class="chat-action-btn">
+                    <i class="fas fa-ellipsis-v"></i>
                 </button>
             </div>
-            <div class="modal-body">
-                <form id="highlightForm">
-                    <div class="form-group">
-                        <label for="highlightText">Highlight Text</label>
-                        <textarea id="highlightText" placeholder="Enter the key point or summary..." rows="4" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="highlightCategory">Category</label>
-                        <select id="highlightCategory" required>
-                            <option value="general">General</option>
-                            <option value="nutrition">Nutrition</option>
-                            <option value="training">Training</option>
-                            <option value="achievement">Achievement</option>
-                            <option value="goal">Goal</option>
-                            <option value="concern">Concern</option>
-                            <option value="question">Question</option>
-                            <option value="feedback">Feedback</option>
-                        </select>
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" class="btn-secondary" onclick="closeHighlightModal()">Cancel</button>
-                        <button type="submit" class="btn-primary">Save Highlight</button>
-                    </div>
-                </form>
+        </div>
+        
+        <div class="unified-messages" id="messagesContainer">
+            <!-- Messages will be injected here -->
+        </div>
+        
+        <div class="message-input-area">
+            <div class="message-input-container">
+                <textarea 
+                    class="message-input" 
+                    placeholder="Type your message..." 
+                    id="messageInput"
+                    rows="1"
+                    onkeydown="handleMessageKeydown(event)"
+                ></textarea>
+                <button class="send-btn" onclick="sendMessage()" id="sendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                    Send
+                </button>
             </div>
         </div>
     </div>
-    <script>
-        /*
-         * This script adds dynamic behaviour to the communication hub by
-         * interacting with your FastAPI backend. It fetches athlete data,
-         * conversation history and highlights, and persists new responses.
-         */
-        let currentAthleteId = null;
-        let currentPlatform = 'whatsapp';
-        let aiAssistActive = true;
+
+    <!-- Highlights Sidebar -->
+    <div class="highlights-sidebar">
+        <div class="highlights-header">
+            <div class="highlights-title">
+                <i class="fas fa-highlighter"></i>
+                Conversation Highlights
+            </div>
+            <div class="highlights-subtitle">Auto-extracted & AI suggestions</div>
+            <div class="highlights-tabs">
+                <button class="highlight-tab active" onclick="switchHighlightTab('all')">All</button>
+                <button class="highlight-tab" onclick="switchHighlightTab('ai')">AI</button>
+                <button class="highlight-tab" onclick="switchHighlightTab('manual')">Manual</button>
+            </div>
+        </div>
+        <div class="highlights-content" id="highlightsContent">
+            <!-- Highlight items injected here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Dynamic data loading
+    let allMessages = [];
+    let allHighlights = [];
+    let currentAthlete = null;
+
+    // Get athlete ID from URL parameters
+    function getAthleteIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('athlete');
+    }
+
+    // Load athlete data dynamically
+    async function loadAthleteData(athleteId) {
+        try {
+            const response = await fetch(`/api/athletes/${athleteId}`);
+            const athlete = await response.json();
+            currentAthlete = athlete;
+            updateAthleteProfile(athlete);
+            
+            // Load conversations for this athlete
+            await loadAthleteConversations(athleteId);
+            
+            // Load highlights for this athlete
+            await loadAthleteHighlights(athleteId);
+            
+        } catch (error) {
+            console.error('Error loading athlete data:', error);
+            showNotification('Error loading athlete data', 'error');
+        }
+    }
+
+    // Update athlete profile display
+    function updateAthleteProfile(athlete) {
+        const avatar = document.querySelector('.customer-avatar span');
+        const name = document.querySelector('.customer-info h3');
+        const status = document.querySelector('.customer-status');
         
-        // Voice recording variables
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-        let recordingStartTime = null;
-        let recordingTimer = null;
-
-        async function initializeHub() {
-            try {
-                // Get list of athletes and pick the first by default
-                const athletesRes = await fetch('/athletes');
-                const athletesData = await athletesRes.json();
-                if (!athletesData.athletes || athletesData.athletes.length === 0) {
-                    console.warn('No athletes found. Please add some athletes via the dashboard.');
-                    return;
-                }
-                // Select the first athlete for demonstration. In future this could
-                // be replaced with a selector component.
-                currentAthleteId = athletesData.athletes[0].id;
-                await loadAthlete(currentAthleteId);
-            } catch (err) {
-                console.error('Error initializing hub:', err);
-            }
-        }
-
-        async function loadAthlete(athleteId) {
-            try {
-                currentAthleteId = athleteId;
-                // Fetch athlete details
-                const profileRes = await fetch(`/athletes/${athleteId}`);
-                const profile = await profileRes.json();
-                if (profile && profile.name) {
-                    updateCustomerSidebar(profile);
-                }
-                // Fetch conversation history
-                const historyRes = await fetch(`/athletes/${athleteId}/history`);
-                const historyData = await historyRes.json();
-                const history = historyData.history || [];
-                updateTimeline(history);
-                updateMessages(history);
-                // Load all highlights
-                await loadAllHighlights();
-            } catch (err) {
-                console.error('Error loading athlete:', err);
-            }
-        }
-
-        function updateCustomerSidebar(profile) {
-            const nameEl = document.getElementById('customerName');
-            const sportEl = document.getElementById('customerSport');
-            const tierEl = document.getElementById('customerTier');
-            const avatarEl = document.getElementById('customerAvatar');
-            const statusEl = document.getElementById('customerStatus');
-            // Set initials as avatar content
-            const initials = profile.name.split(' ').map(n => n[0]).join('');
-            avatarEl.innerText = initials;
-            // Example status: online if last updated within 24h
-            statusEl.style.background = profile.phone ? 'var(--online)' : 'var(--offline)';
-            nameEl.innerText = profile.name;
-            sportEl.innerText = profile.sport || '';
-            tierEl.innerText = profile.level || '';
-            // Platform indicators (phones + email)
-            const indicators = document.querySelector('.platform-indicators');
-            indicators.innerHTML = '';
-            if (profile.phone) {
-                const whatsappStatus = document.createElement('div');
-                whatsappStatus.className = 'platform-status whatsapp';
-                whatsappStatus.innerHTML = '<div class="platform-dot"></div><span>WhatsApp</span>';
-                indicators.appendChild(whatsappStatus);
-            }
-            if (profile.phone) {
-                const telegramStatus = document.createElement('div');
-                telegramStatus.className = 'platform-status telegram';
-                telegramStatus.innerHTML = '<div class="platform-dot"></div><span>Telegram</span>';
-                indicators.appendChild(telegramStatus);
-            }
-            if (profile.email) {
-                const emailStatus = document.createElement('div');
-                emailStatus.className = 'platform-status email';
-                emailStatus.innerHTML = '<div class="platform-dot"></div><span>Email</span>';
-                indicators.appendChild(emailStatus);
-            }
-        }
-
-        function updateTimeline(records) {
-            const timeline = document.getElementById('timelineList');
-            timeline.innerHTML = '';
-            records.forEach(rec => {
-                const item = document.createElement('div');
-                // Determine source platform for styling
-                const platform = (rec.source || 'manual').toLowerCase();
-                item.className = `timeline-item ${platform} animate-fade-in`;
-                item.onclick = () => loadConversation(rec);
-                
-                // Build content
-                const content = document.createElement('div');
-                content.className = 'timeline-content-item';
-                
-                const header = document.createElement('div');
-                header.className = 'timeline-item-header';
-                const platformDiv = document.createElement('div');
-                platformDiv.className = `timeline-platform ${platform}`;
-                platformDiv.innerHTML = `<i class="${platformIcon(platform)}"></i><span>${platformLabel(platform)}</span>`;
-                const dateDiv = document.createElement('div');
-                dateDiv.className = 'timeline-date';
-                dateDiv.innerText = new Date(rec.timestamp).toLocaleString();
-                header.appendChild(platformDiv);
-                header.appendChild(dateDiv);
-                
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'timeline-message';
-                messageDiv.innerText = rec.transcription || '(no transcription)';
-                
-                content.appendChild(header);
-                content.appendChild(messageDiv);
-                item.appendChild(content);
-                timeline.appendChild(item);
-            });
-        }
-
-        function updateMessages(records) {
-            const messagesContainer = document.getElementById('unifiedMessages');
-            messagesContainer.innerHTML = '';
-            // Reverse chronological order to oldest first for chat flow
-            const sorted = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            sorted.forEach(rec => {
-                // Athlete message
-                if (rec.transcription) {
-                    const msgEl = buildMessageElement({
-                        sender: 'Athlete',
-                        platform: rec.source || 'manual',
-                        time: rec.timestamp,
-                        content: rec.transcription,
-                        role: 'athlete'
-                    });
-                    messagesContainer.appendChild(msgEl);
-                }
-                // Coach/assistant message
-                if (rec.final_response) {
-                    const msgEl2 = buildMessageElement({
-                        sender: 'Coach',
-                        platform: rec.source || 'manual',
-                        time: rec.timestamp,
-                        content: rec.final_response,
-                        role: 'coach'
-                    });
-                    messagesContainer.appendChild(msgEl2);
-                }
-            });
-            // Scroll to bottom
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function buildMessageElement({ sender, platform, time, content, role }) {
-            const wrapper = document.createElement('div');
-            wrapper.className = `message ${platform.toLowerCase()} animate-fade-in`;
-            const avatar = document.createElement('div');
-            avatar.className = 'message-avatar';
-            avatar.innerText = sender[0];
-            const contentWrapper = document.createElement('div');
-            contentWrapper.className = 'message-content';
-            const header = document.createElement('div');
-            header.className = 'message-header';
-            const senderSpan = document.createElement('span');
-            senderSpan.className = 'message-sender';
-            senderSpan.innerText = sender;
-            const platformDiv = document.createElement('div');
-            platformDiv.className = `message-platform ${platform.toLowerCase()}`;
-            platformDiv.innerHTML = `<i class="${platformIcon(platform)}"></i><span>${platformLabel(platform)}</span>`;
-            const timeSpan = document.createElement('span');
-            timeSpan.className = 'message-time';
-            timeSpan.innerText = new Date(time).toLocaleTimeString();
-            header.appendChild(senderSpan);
-            header.appendChild(platformDiv);
-            header.appendChild(timeSpan);
-            const bubble = document.createElement('div');
-            bubble.className = 'message-bubble';
-            bubble.innerText = content;
-            contentWrapper.appendChild(header);
-            contentWrapper.appendChild(bubble);
-            wrapper.appendChild(avatar);
-            wrapper.appendChild(contentWrapper);
-            return wrapper;
-        }
-
-        function platformIcon(platform) {
-            switch (platform.toLowerCase()) {
-                case 'whatsapp': return 'fab fa-whatsapp';
-                case 'telegram': return 'fab fa-telegram-plane';
-                case 'email': return 'fas fa-envelope';
-                case 'sms': return 'fas fa-sms';
-                case 'phone': return 'fas fa-phone';
-                default: return 'fas fa-comments';
-            }
-        }
-        function platformLabel(platform) {
-            switch (platform.toLowerCase()) {
-                case 'whatsapp': return 'WhatsApp';
-                case 'telegram': return 'Telegram';
-                case 'email': return 'Email';
-                case 'sms': return 'SMS';
-                case 'phone': return 'Phone';
-                case 'manual': return 'Manual';
-                default: return platform.charAt(0).toUpperCase() + platform.slice(1);
-            }
-        }
-
-
-
-        // Called when clicking a timeline item; loads a single conversation into the chat
-        function loadConversation(record) {
-            updateMessages([record]);
-        }
-
-        function selectResponsePlatform(platform) {
-            currentPlatform = platform;
-            // Toggle active state on buttons
-            ['whatsapp','telegram','email'].forEach(pl => {
-                const btn = document.getElementById(pl + 'Option');
-                if (btn) {
-                    if (pl === platform) btn.classList.add('active');
-                    else btn.classList.remove('active');
-                }
-            });
-            // Toggle email subject field when email is selected
-            document.getElementById('emailFields').style.display = (platform === 'email') ? 'block' : 'none';
-        }
-
-        function toggleAI() {
-            aiAssistActive = !aiAssistActive;
-            const btn = document.getElementById('aiToggle');
-            if (aiAssistActive) btn.classList.add('active');
-            else btn.classList.remove('active');
-        }
-
-        function handleKeyPress(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendResponse();
-            }
-        }
-        function handleInputChange() {
-            // Optionally implement character count or other input behaviours
-        }
-        function loadTemplate() { alert('Template feature not yet implemented.'); }
-        function addEmoji() { alert('Emoji picker not yet implemented.'); }
-        function translateText() { alert('Translate feature not yet implemented.'); }
-        function extractHighlights() { alert('Highlight extraction triggered.'); }
-        
-        async function toggleVoiceRecording() {
-            if (!isRecording) {
-                await startRecording();
-            } else {
-                await stopRecording();
-            }
-        }
-        
-        async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    await transcribeAudio(audioBlob);
-                    stream.getTracks().forEach(track => track.stop());
-                };
-                
-                mediaRecorder.start();
-                isRecording = true;
-                recordingStartTime = Date.now();
-                
-                // Update UI
-                document.getElementById('voiceRecording').style.display = 'flex';
-                document.getElementById('voiceBtn').classList.add('active');
-                document.getElementById('recordBtn').classList.add('active');
-                
-                // Start timer
-                startRecordingTimer();
-                
-            } catch (error) {
-                console.error('Error starting recording:', error);
-                alert('Error accessing microphone. Please ensure microphone permissions are granted.');
-            }
-        }
-        
-        function pauseRecording() {
-            if (mediaRecorder && isRecording) {
-                if (mediaRecorder.state === 'recording') {
-                    mediaRecorder.pause();
-                    clearInterval(recordingTimer);
-                } else if (mediaRecorder.state === 'paused') {
-                    mediaRecorder.resume();
-                    startRecordingTimer();
-                }
-            }
-        }
-        
-        async function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
-                isRecording = false;
-                recordingStartTime = null;
-                clearInterval(recordingTimer);
-                
-                // Update UI
-                document.getElementById('voiceRecording').style.display = 'none';
-                document.getElementById('voiceBtn').classList.remove('active');
-                document.getElementById('recordBtn').classList.remove('active');
-                document.getElementById('recordingTime').textContent = '00:00';
-            }
-        }
-        
-        function startRecordingTimer() {
-            recordingTimer = setInterval(() => {
-                if (recordingStartTime) {
-                    const elapsed = Date.now() - recordingStartTime;
-                    const minutes = Math.floor(elapsed / 60000);
-                    const seconds = Math.floor((elapsed % 60000) / 1000);
-                    document.getElementById('recordingTime').textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                }
-            }, 1000);
-        }
-        
-        async function transcribeAudio(audioBlob) {
-            try {
-                const formData = new FormData();
-                formData.append('file', audioBlob, 'recording.wav');
-                
-                const response = await fetch('/transcribe', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.transcription) {
-                    // Insert transcription into the response textarea
-                    const textarea = document.getElementById('responseInput');
-                    const currentText = textarea.value;
-                    const newText = currentText + (currentText ? '\n' : '') + result.transcription;
-                    textarea.value = newText;
-                    
-                    // Focus on the textarea
-                    textarea.focus();
-                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-                    
-                    // Show success notification
-                    showNotification('Voice message transcribed successfully!', 'success');
-                } else {
-                    showNotification('Failed to transcribe audio. Please try again.', 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error transcribing audio:', error);
-                showNotification('Error transcribing audio. Please try again.', 'error');
-            }
-        }
-        
-        function showNotification(message, type = 'info') {
-            // Create notification element
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <div class="notification-icon">
-                        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                    </div>
-                    <div class="notification-body">
-                        <div class="notification-title">${message}</div>
-                    </div>
-                </div>
+        if (avatar && name && status) {
+            // Get initials from name
+            const initials = athlete.name.split(' ').map(n => n[0]).join('');
+            avatar.textContent = initials;
+            name.textContent = athlete.name;
+            status.innerHTML = `
+                <span class="status-dot online"></span>
+                Online • ${athlete.sport || 'Athlete'} ${athlete.level ? `• ${athlete.level}` : ''}
             `;
-            
-            // Add to page
-            document.body.appendChild(notification);
-            
-            // Show notification
-            setTimeout(() => notification.classList.add('show'), 100);
-            
-            // Remove after 3 seconds
-            setTimeout(() => {
-                notification.classList.remove('show');
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
         }
-        
-        function attachFile() { alert('File attachment not yet implemented.'); }
+    }
 
-        async function sendResponse() {
-            const text = document.getElementById('responseInput').value.trim();
-            if (!text || !currentAthleteId) {
-                alert('Please enter a response.');
-                return;
-            }
-            try {
-                // Save the response directly without AI generation; it will be stored as both generated and final response.
-                const formData = new FormData();
-                formData.append('athlete_id', currentAthleteId);
-                formData.append('transcription', '');
-                formData.append('generated_response', text);
-                formData.append('final_response', text);
-                formData.append('category', 'general');
-                formData.append('priority', 'medium');
-                formData.append('notes', '');
-                formData.append('source', currentPlatform);
-                const res = await fetch('/save', { method: 'POST', body: formData });
-                const data = await res.json();
-                if (data.status === 'saved') {
-                    // Clear input
-                    document.getElementById('responseInput').value = '';
-                    // Reload athlete history to show new message
-                    await loadAthlete(currentAthleteId);
-                } else {
-                    alert('Failed to save message.');
-                }
-            } catch (err) {
-                console.error('Error sending response:', err);
-                alert('Error sending response');
-            }
+    // Load conversations for the athlete
+    async function loadAthleteConversations(athleteId) {
+        try {
+            const response = await fetch(`/communication-hub/athletes/${athleteId}/conversations`);
+            const data = await response.json();
+            
+            allMessages = data.conversations.map(conv => ({
+                id: conv.id,
+                sender: currentAthlete.name,
+                platform: conv.source || 'manual',
+                time: conv.timestamp,
+                content: conv.transcription,
+                role: 'athlete'
+            }));
+            
+            updateMessages();
+            updateTimeline();
+            
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+            allMessages = [];
+            updateMessages();
         }
+    }
 
-        // Highlight tab switching (UI only)
-        function switchHighlightTab(tab) {
-            document.getElementById('tabAuto').classList.remove('active');
-            document.getElementById('tabManual').classList.remove('active');
-            document.getElementById('tabAI').classList.remove('active');
-            if (tab === 'auto') document.getElementById('tabAuto').classList.add('active');
-            if (tab === 'manual') document.getElementById('tabManual').classList.add('active');
-            if (tab === 'ai') document.getElementById('tabAI').classList.add('active');
+    // Load highlights for the athlete
+    async function loadAthleteHighlights(athleteId) {
+        try {
+            const response = await fetch(`/api/athletes/${athleteId}/highlights`);
+            const data = await response.json();
+            
+            allHighlights = data.highlights.map(highlight => ({
+                id: highlight.id,
+                text: highlight.highlight_text,
+                category: highlight.category,
+                timestamp: highlight.created_at,
+                source: highlight.is_manual ? 'manual' : 'ai'
+            }));
+            
+            updateAllHighlights();
+            
+        } catch (error) {
+            console.error('Error loading highlights:', error);
+            allHighlights = [];
+            updateAllHighlights();
         }
+    }
 
-        // Highlights Functions
-        let allHighlights = [];
+    // Initialize with dynamic data
+    async function initializeData() {
+        const athleteId = getAthleteIdFromUrl();
         
-        function updateAllHighlights() {
-            const container = document.getElementById('highlightsContent');
-            container.innerHTML = '';
-            
-            if (allHighlights.length === 0) {
-                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No highlights yet. Click "Add Manual Highlight" to create one.</p>';
-                return;
-            }
-            
-            allHighlights.forEach(h => {
-                const item = document.createElement('div');
-                item.className = `highlight-item ${h.category || 'general'} animate-fade-in`;
-                
-                const bullet = document.createElement('div');
-                bullet.className = 'highlight-bullet';
-                
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'highlight-content';
-                
-                const textDiv = document.createElement('div');
-                textDiv.className = 'highlight-text';
-                textDiv.innerText = h.highlight_text;
-                
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'highlight-meta';
-                
-                const categoryDiv = document.createElement('div');
-                categoryDiv.className = 'highlight-category';
-                categoryDiv.innerText = h.category || 'general';
-                
-                const timeDiv = document.createElement('div');
-                timeDiv.className = 'highlight-time';
-                timeDiv.innerText = h.created_at ? new Date(h.created_at).toLocaleDateString() : '';
-                
-                metaDiv.appendChild(categoryDiv);
-                metaDiv.appendChild(timeDiv);
-                contentDiv.appendChild(textDiv);
-                contentDiv.appendChild(metaDiv);
-                item.appendChild(bullet);
-                item.appendChild(contentDiv);
-                container.appendChild(item);
-            });
-        }
-        
-        function openHighlightModal(highlightId = null) {
-            const modal = document.getElementById('highlightModal');
-            const title = document.getElementById('modalTitle');
-            const form = document.getElementById('highlightForm');
-            const textarea = document.getElementById('highlightText');
-            const category = document.getElementById('highlightCategory');
-            
-            if (highlightId) {
-                // Edit mode
-                const highlight = allHighlights.find(h => h.id === highlightId);
-                if (highlight) {
-                    title.textContent = 'Edit Highlight';
-                    textarea.value = highlight.highlight_text;
-                    category.value = highlight.category || 'general';
-                    form.dataset.highlightId = highlightId;
-                }
-            } else {
-                // Create mode
-                title.textContent = 'Create Manual Highlight';
-                textarea.value = '';
-                category.value = 'general';
-                delete form.dataset.highlightId;
-            }
-            
-            modal.classList.add('show');
-        }
-        
-        function closeHighlightModal() {
-            const modal = document.getElementById('highlightModal');
-            modal.classList.remove('show');
-        }
-        
-        async function saveHighlight(event) {
-            event.preventDefault();
-            
-            const form = event.target;
-            const textarea = document.getElementById('highlightText');
-            const category = document.getElementById('highlightCategory');
-            const highlightId = form.dataset.highlightId;
-            
-            const highlightData = {
-                highlight_text: textarea.value.trim(),
-                category: category.value
+        if (athleteId) {
+            await loadAthleteData(athleteId);
+        } else {
+            // Fallback to sample data if no athlete selected
+            console.log('No athlete selected, using sample data');
+            currentAthlete = {
+                name: "Select an Athlete",
+                sport: "Athlete",
+                level: ""
             };
-            
-            if (!highlightData.highlight_text) {
-                showNotification('Please enter highlight text', 'error');
-                return;
-            }
-            
-            try {
-                let response;
-                if (highlightId) {
-                    // Update existing highlight
-                    const formData = new FormData();
-                    formData.append('highlight_text', highlightData.highlight_text);
-                    formData.append('category', highlightData.category);
-                    
-                    response = await fetch(`/highlights/${highlightId}/content`, {
-                        method: 'PUT',
-                        body: formData
-                    });
-                } else {
-                    // Create new highlight
-                    const formData = new FormData();
-                    formData.append('highlight_text', highlightData.highlight_text);
-                    formData.append('category', highlightData.category);
-                    
-                    response = await fetch(`/athletes/${currentAthleteId}/highlights`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'success' || result.id) {
-                    showNotification(highlightId ? 'Highlight updated successfully!' : 'Highlight created successfully!', 'success');
-                    closeHighlightModal();
-                    
-                    // Reload all highlights
-                    await loadAllHighlights();
-                } else {
-                    showNotification('Failed to save highlight', 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error saving highlight:', error);
-                showNotification('Error saving highlight', 'error');
-            }
+            updateAthleteProfile(currentAthlete);
         }
-        
-        async function loadAllHighlights() {
-            try {
-                const response = await fetch(`/athletes/${currentAthleteId}/highlights`);
-                const data = await response.json();
-                allHighlights = data.highlights || [];
-                updateAllHighlights();
-            } catch (error) {
-                console.error('Error loading highlights:', error);
-                allHighlights = [];
-                updateAllHighlights();
-            }
-        }
-        
-        async function deleteHighlight(highlightId) {
-            if (!confirm('Are you sure you want to delete this highlight?')) {
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/highlights/${highlightId}`, {
-                    method: 'DELETE'
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showNotification('Highlight deleted successfully!', 'success');
-                    await loadAllHighlights();
-                } else {
-                    showNotification('Failed to delete highlight', 'error');
-                }
-                
-            } catch (error) {
-                console.error('Error deleting highlight:', error);
-                showNotification('Error deleting highlight', 'error');
-            }
-        }
-        
-        function editHighlight(highlightId) {
-            openHighlightModal(highlightId);
-        }
-        
-        // Placeholder filter function; currently no filtering logic implemented
-        function filterTimeline(filter) {
-            console.log('Timeline filter clicked:', filter);
-        }
+    }
 
-        // Highlight tab switching (UI only)
-        function switchHighlightTab(tab) {
-            document.querySelectorAll('.highlight-tab').forEach(tabBtn => {
-                tabBtn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            console.log('Switched to', tab, 'highlights');
+    // Update messages display
+    function updateMessages() {
+        const container = document.getElementById('messagesContainer');
+        container.innerHTML = '';
+        
+        allMessages.forEach(msg => {
+            const messageElement = buildMessageElement(msg);
+            container.appendChild(messageElement);
+        });
+        
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+    }
+
+    // Build message element
+    function buildMessageElement({ sender, platform, time, content, role }) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `message ${platform.toLowerCase()}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.innerText = sender[0];
+        
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'message-content';
+        
+        const header = document.createElement('div');
+        header.className = 'message-header';
+        
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'message-sender';
+        senderSpan.innerText = sender;
+        
+        const platformDiv = document.createElement('div');
+        platformDiv.className = `message-platform ${platform.toLowerCase()}`;
+        platformDiv.innerText = platform;
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.innerText = new Date(time).toLocaleTimeString();
+        
+        header.appendChild(senderSpan);
+        header.appendChild(platformDiv);
+        header.appendChild(timeSpan);
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.innerText = content;
+        
+        contentWrapper.appendChild(header);
+        contentWrapper.appendChild(bubble);
+        
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(contentWrapper);
+        
+        return wrapper;
+    }
+
+    // Send message function
+    async function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const content = input.value.trim();
+        
+        if (!content) return;
+        
+        if (!currentAthlete || !currentAthlete.id) {
+            showNotification('Please select an athlete first', 'error');
+            return;
         }
         
-        // Initialize once the page has loaded
-        window.addEventListener('load', () => {
-            initializeHub();
+        // Disable send button while sending
+        const sendBtn = document.getElementById('sendBtn');
+        const originalText = sendBtn.innerHTML;
+        sendBtn.innerHTML = '<div class="loading-spinner"></div> Sending...';
+        sendBtn.disabled = true;
+        
+        try {
+            // Send message via API
+            const formData = new FormData();
+            formData.append('athlete_id', currentAthlete.id);
+            formData.append('message', content);
+            formData.append('platform', 'auto'); // Auto-select best available platform
             
-            // Add form event listener for highlight modal
-            document.getElementById('highlightForm').addEventListener('submit', saveHighlight);
+            const response = await fetch('/communication-hub/send-message', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.status === 'sent' || result.status === 'saved') {
+                // Add message to local display
+                const newMessage = {
+                    id: Date.now(),
+                    sender: "Coach",
+                    platform: "manual",
+                    time: new Date().toISOString(),
+                    content: content,
+                    role: "coach"
+                };
+                
+                allMessages.push(newMessage);
+                updateMessages();
+                updateTimeline();
+                
+                input.value = '';
+                input.style.height = 'auto';
+                
+                showNotification(result.message, 'success');
+            } else {
+                throw new Error(result.message || 'Failed to send message');
+            }
+            
+        } catch (error) {
+            console.error('Error sending message:', error);
+            showNotification('Error sending message: ' + error.message, 'error');
+        } finally {
+            sendBtn.innerHTML = originalText;
+            sendBtn.disabled = false;
+        }
+    }
+
+    // Handle message input keydown
+    function handleMessageKeydown(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+        
+        // Auto-resize textarea
+        const textarea = event.target;
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+
+    // Update timeline
+    function updateTimeline() {
+        const timeline = document.getElementById('timelineList');
+        timeline.innerHTML = '';
+        
+        // Group messages by date
+        const groupedMessages = groupMessagesByDate(allMessages);
+        
+        Object.keys(groupedMessages).forEach(date => {
+            const messages = groupedMessages[date];
+            const item = document.createElement('div');
+            item.className = 'timeline-item';
+            item.onclick = () => scrollToDate(date);
+            
+            const header = document.createElement('div');
+            header.className = 'timeline-item-header';
+            
+            const platformDiv = document.createElement('div');
+            platformDiv.className = `timeline-platform ${messages[0].platform.toLowerCase()}`;
+            platformDiv.innerHTML = `<i class="fas ${getPlatformIcon(messages[0].platform)}"></i><span>${messages[0].platform}</span>`;
+            
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'timeline-time';
+            timeDiv.innerText = new Date(date).toLocaleDateString();
+            
+            header.appendChild(platformDiv);
+            header.appendChild(timeDiv);
+            
+            const content = document.createElement('div');
+            content.className = 'timeline-content';
+            content.innerText = messages[0].content.substring(0, 100) + (messages[0].content.length > 100 ? '...' : '');
+            
+            item.appendChild(header);
+            item.appendChild(content);
+            timeline.appendChild(item);
         });
-    </script>
-</body>
-</html>
+    }
+
+    // Group messages by date
+    function groupMessagesByDate(messages) {
+        const grouped = {};
+        messages.forEach(msg => {
+            const date = new Date(msg.time).toDateString();
+            if (!grouped[date]) {
+                grouped[date] = [];
+            }
+            grouped[date].push(msg);
+        });
+        return grouped;
+    }
+
+    // Get platform icon
+    function getPlatformIcon(platform) {
+        const icons = {
+            'whatsapp': 'fab fa-whatsapp',
+            'telegram': 'fab fa-telegram',
+            'email': 'fas fa-envelope',
+            'sms': 'fas fa-sms',
+            'phone': 'fas fa-phone'
+        };
+        return icons[platform.toLowerCase()] || 'fas fa-comment';
+    }
+
+    // Update highlights
+    function updateAllHighlights() {
+        const container = document.getElementById('highlightsContent');
+        container.innerHTML = '';
+        
+        if (allHighlights.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No highlights yet. Start a conversation to see AI-generated highlights.</p>';
+            return;
+        }
+        
+        allHighlights.forEach(h => {
+            const item = document.createElement('div');
+            item.className = `highlight-item ${h.category || 'general'}`;
+            
+            const bullet = document.createElement('div');
+            bullet.className = 'highlight-bullet';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'highlight-content';
+            
+            const textDiv = document.createElement('div');
+            textDiv.className = 'highlight-text';
+            textDiv.innerText = h.text;
+            
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'highlight-meta';
+            
+            const categorySpan = document.createElement('span');
+            categorySpan.className = 'highlight-category';
+            categorySpan.innerText = h.category || 'general';
+            
+            const timeSpan = document.createElement('span');
+            timeSpan.innerText = new Date(h.timestamp).toLocaleTimeString();
+            
+            const sourceSpan = document.createElement('span');
+            sourceSpan.innerText = h.source === 'ai' ? 'AI Generated' : 'Manual';
+            
+            metaDiv.appendChild(categorySpan);
+            metaDiv.appendChild(timeSpan);
+            metaDiv.appendChild(sourceSpan);
+            
+            contentDiv.appendChild(textDiv);
+            contentDiv.appendChild(metaDiv);
+            
+            item.appendChild(bullet);
+            item.appendChild(contentDiv);
+            container.appendChild(item);
+        });
+    }
+
+    // Placeholder filter function; currently no filtering logic implemented
+    function filterTimeline(filter) {
+        console.log('Timeline filter clicked:', filter);
+    }
+
+    // Highlight tab switching (UI only)
+    function switchHighlightTab(tab) {
+        document.querySelectorAll('.highlight-tab').forEach(tabBtn => {
+            tabBtn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        console.log('Switched to', tab, 'highlights');
+    }
+
+    // Scroll to date (placeholder)
+    function scrollToDate(date) {
+        console.log('Scrolling to date:', date);
+    }
+
+    // Notification function
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: var(--space-3);">
+                <div style="font-size: 1.25rem;">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                </div>
+                <div>
+                    <div style="font-weight: 600; font-size: 0.875rem;">${message}</div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Show notification
+        setTimeout(() => notification.classList.add('show'), 100);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeData();
+    });
+</script>
+{% endblock %}

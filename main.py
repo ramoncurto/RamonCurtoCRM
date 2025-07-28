@@ -9,6 +9,7 @@ import json
 from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
 # OpenAI imports for GPT-4o-mini integration
 from dotenv import load_dotenv
@@ -223,11 +224,15 @@ with conn:
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    """Serve the main dashboard page."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    """Redirect root to dashboard."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/communication-hub", response_class=HTMLResponse)
@@ -316,9 +321,22 @@ async def send_communication_message(
 ) -> JSONResponse:
     """Send a message to an athlete via specified platform."""
     try:
+        # Get athlete information
+        with conn:
+            cursor = conn.execute(
+                "SELECT name, email, phone FROM athletes WHERE id = ?",
+                (athlete_id,)
+            )
+            athlete = cursor.fetchone()
+            
+        if not athlete:
+            return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
+            
+        athlete_name, athlete_email, athlete_phone = athlete
+        
+        # Save the message to database
         timestamp = datetime.datetime.now().isoformat()
         
-        # Save the outgoing message as a conversation record
         with conn:
             conn.execute(
                 """
@@ -341,16 +359,105 @@ async def send_communication_message(
                 ),
             )
         
-        # In a real implementation, this would send the actual message
-        # via WhatsApp API, Telegram Bot API, or email service
+        # Smart platform selection based on available contact info
+        if platform.lower() == "whatsapp" and athlete_phone:
+            # Send via WhatsApp if phone number is available
+            whatsapp_result = await send_whatsapp_message(athlete_phone, message)
+            if whatsapp_result["status"] == "sent":
+                return JSONResponse({
+                    "status": "sent", 
+                    "message": f"Message sent via WhatsApp to {athlete_name}",
+                    "timestamp": timestamp,
+                    "platform": "whatsapp"
+                })
+            elif whatsapp_result["status"] == "skipped":
+                return JSONResponse({
+                    "status": "saved", 
+                    "message": f"Message saved (WhatsApp not configured) for {athlete_name}",
+                    "timestamp": timestamp,
+                    "platform": "whatsapp"
+                })
+            else:
+                return JSONResponse({
+                    "status": "error", 
+                    "message": f"WhatsApp sending failed: {whatsapp_result.get('message', 'Unknown error')}"
+                }, status_code=500)
         
-        return JSONResponse({
-            "status": "sent",
-            "message": f"Message sent via {platform}",
-            "timestamp": timestamp
-        })
+        elif platform.lower() == "email" and athlete_email:
+            # TODO: Implement email sending
+            return JSONResponse({
+                "status": "saved", 
+                "message": f"Message queued for email to {athlete_name}",
+                "timestamp": timestamp,
+                "platform": "email"
+            })
         
+        elif platform.lower() == "sms" and athlete_phone:
+            # TODO: Implement SMS sending
+            return JSONResponse({
+                "status": "saved", 
+                "message": f"Message queued for SMS to {athlete_name}",
+                "timestamp": timestamp,
+                "platform": "sms"
+            })
+        
+        # Auto-select best available platform if not specified or not available
+        elif platform.lower() == "auto" or platform.lower() == "manual":
+            if athlete_phone:
+                # Try WhatsApp first
+                whatsapp_result = await send_whatsapp_message(athlete_phone, message)
+                if whatsapp_result["status"] == "sent":
+                    return JSONResponse({
+                        "status": "sent", 
+                        "message": f"Message sent via WhatsApp to {athlete_name}",
+                        "timestamp": timestamp,
+                        "platform": "whatsapp"
+                    })
+                elif whatsapp_result["status"] == "skipped":
+                    # WhatsApp not configured, save to database
+                    return JSONResponse({
+                        "status": "saved", 
+                        "message": f"Message saved for {athlete_name} (WhatsApp not configured)",
+                        "timestamp": timestamp,
+                        "platform": "whatsapp"
+                    })
+                else:
+                    # WhatsApp failed, save to database
+                    return JSONResponse({
+                        "status": "saved", 
+                        "message": f"Message saved for {athlete_name} (WhatsApp failed)",
+                        "timestamp": timestamp,
+                        "platform": "whatsapp"
+                    })
+            elif athlete_email:
+                # Try email
+                return JSONResponse({
+                    "status": "saved", 
+                    "message": f"Message queued for email to {athlete_name}",
+                    "timestamp": timestamp,
+                    "platform": "email"
+                })
+            else:
+                # No contact info available
+                return JSONResponse({
+                    "status": "saved", 
+                    "message": f"Message saved for {athlete_name} (no contact info available)",
+                    "timestamp": timestamp,
+                    "platform": "manual"
+                })
+        
+        else:
+            # For other platforms or when contact info is missing, just save to database
+            contact_info = "phone" if athlete_phone else "email" if athlete_email else "no contact info"
+            return JSONResponse({
+                "status": "saved", 
+                "message": f"Message saved for {athlete_name} via {platform} ({contact_info})",
+                "timestamp": timestamp,
+                "platform": platform
+            })
+            
     except Exception as e:
+        logger.error(f"Error sending communication message: {e}")
         return JSONResponse({
             "status": "error",
             "message": f"Error sending message: {str(e)}"
@@ -619,7 +726,7 @@ async def save(
     return JSONResponse({"status": "saved"})
 
 
-@app.get("/athletes", response_class=JSONResponse)
+@app.get("/api/athletes", response_class=JSONResponse)
 async def get_athletes() -> JSONResponse:
     """Get all athletes."""
     with conn:
@@ -643,7 +750,7 @@ async def get_athletes() -> JSONResponse:
     })
 
 
-@app.post("/athletes", response_class=JSONResponse)
+@app.post("/api/athletes", response_class=JSONResponse)
 async def create_athlete(
     name: str = Form(...),
     email: str = Form(""),
@@ -664,7 +771,7 @@ async def create_athlete(
         return JSONResponse({"status": "error", "message": "Email already exists"})
 
 
-@app.get("/athletes/{athlete_id}/history", response_class=JSONResponse)
+@app.get("/api/athletes/{athlete_id}/history", response_class=JSONResponse)
 async def get_athlete_history(athlete_id: int) -> JSONResponse:
     """Get conversation history for a specific athlete."""
     with conn:
@@ -696,13 +803,19 @@ async def get_athlete_history(athlete_id: int) -> JSONResponse:
     })
 
 
-@app.get("/athletes/manage", response_class=HTMLResponse)
-async def manage_athletes(request: Request) -> HTMLResponse:
+@app.get("/athletes", response_class=HTMLResponse)
+async def athletes(request: Request) -> HTMLResponse:
     """Serve the athletes management page."""
     return templates.TemplateResponse("athletes.html", {"request": request})
 
 
-@app.get("/athletes/{athlete_id}", response_class=JSONResponse)
+@app.get("/athletes/manage", response_class=HTMLResponse)
+async def manage_athletes(request: Request) -> HTMLResponse:
+    """Serve the athletes management page (legacy route)."""
+    return templates.TemplateResponse("athletes.html", {"request": request})
+
+
+@app.get("/api/athletes/{athlete_id}", response_class=JSONResponse)
 async def get_athlete(athlete_id: int) -> JSONResponse:
     """Get athlete details."""
     with conn:
@@ -724,7 +837,7 @@ async def get_athlete(athlete_id: int) -> JSONResponse:
     return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
 
 
-@app.put("/athletes/{athlete_id}", response_class=JSONResponse)
+@app.put("/api/athletes/{athlete_id}", response_class=JSONResponse)
 async def update_athlete(
     athlete_id: int,
     name: str = Form(...),
@@ -757,7 +870,7 @@ async def update_athlete(
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
-@app.delete("/athletes/{athlete_id}", response_class=JSONResponse)
+@app.delete("/api/athletes/{athlete_id}", response_class=JSONResponse)
 async def delete_athlete(athlete_id: int) -> JSONResponse:
     """Delete an athlete and all associated records."""
     try:
@@ -869,6 +982,129 @@ async def view_athlete_history(request: Request, athlete_id: int) -> HTMLRespons
 
 # WhatsApp and Telegram Integration Endpoints
 
+def extract_whatsapp_events(payload: dict) -> list[dict]:
+    """Extrae eventos de mensajes del payload de WhatsApp de Meta."""
+    events = []
+    for entry in payload.get("entry", []):
+        for change in entry.get("changes", []):
+            value = change.get("value", {})
+            for msg in value.get("messages", []):
+                phone = msg.get("from", "")
+                # obtener cuerpo según el tipo de mensaje
+                msg_type = msg.get("type")
+                if msg_type == "text":
+                    text = msg.get("text", {}).get("body", "")
+                elif msg_type == "image":
+                    text = "[Imagen recibida]"
+                elif msg_type == "audio":
+                    text = "[Audio recibido]"
+                elif msg_type == "document":
+                    text = "[Documento recibido]"
+                else:
+                    text = msg.get(msg_type, {}).get("body", "") if msg_type else ""
+                events.append({"phone": phone, "text": text, "id": msg.get("id")})
+    return events
+
+async def send_whatsapp_message(phone: str, message: str) -> dict:
+    """Envía un mensaje por WhatsApp usando Twilio o Meta API."""
+    
+    # Try Twilio first (if configured)
+    twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
+    
+    if twilio_account_sid and twilio_auth_token and twilio_whatsapp_number:
+        return await send_whatsapp_via_twilio(phone, message)
+    
+    # Fallback to Meta API
+    phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    
+    if not phone_id or not access_token:
+        logger.warning("No se configuraron credenciales de WhatsApp (Twilio o Meta); mensaje no enviado")
+        return {"status": "skipped", "message": "WhatsApp credentials not configured"}
+    
+    return await send_whatsapp_via_meta(phone, message)
+
+
+async def send_whatsapp_via_twilio(phone: str, message: str) -> dict:
+    """Envía un mensaje por WhatsApp usando Twilio API directamente."""
+    try:
+        import httpx
+        
+        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
+        
+        if not account_sid or not auth_token or not from_number:
+            return {"status": "error", "message": "Twilio credentials not configured"}
+        
+        # Ensure phone number has whatsapp: prefix
+        to_number = phone if phone.startswith("whatsapp:") else f"whatsapp:{phone}"
+        from_number = from_number if from_number.startswith("whatsapp:") else f"whatsapp:{from_number}"
+        
+        # Twilio API endpoint
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+        
+        # Request payload
+        payload = {
+            "Body": message,
+            "From": from_number,
+            "To": to_number
+        }
+        
+        # Basic auth with account SID and auth token
+        auth = (account_sid, auth_token)
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, data=payload, auth=auth)
+            
+            if response.status_code == 201:
+                data = response.json()
+                logger.info(f"Twilio WhatsApp message sent: {data.get('sid')}")
+                return {"status": "sent", "data": {"sid": data.get('sid')}}
+            else:
+                logger.error(f"Twilio API error: {response.status_code} - {response.text}")
+                return {"status": "error", "message": f"Twilio API error: {response.status_code}"}
+        
+    except Exception as e:
+        logger.error(f"Error sending Twilio WhatsApp message: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+async def send_whatsapp_via_meta(phone: str, message: str) -> dict:
+    """Envía un mensaje por WhatsApp usando la API de Meta."""
+    phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    
+    if not phone_id or not access_token:
+        return {"status": "skipped", "message": "Meta WhatsApp credentials not configured"}
+    
+    url = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone,
+        "type": "text",
+        "text": {"body": message}
+    }
+    headers = {
+        "Authorization": f"Bearer {access_token}", 
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(url, json=payload, headers=headers)
+            if resp.status_code == 200:
+                return {"status": "sent", "data": resp.json()}
+            else:
+                logger.error(f"Meta WhatsApp API error: {resp.status_code} - {resp.text}")
+                return {"status": "error", "data": resp.json()}
+    except Exception as e:
+        logger.error(f"Error sending Meta WhatsApp message: {e}")
+        return {"status": "error", "message": str(e)}
+
 async def process_incoming_message(phone: str, message: str, source: str, external_id: str = None) -> dict:
     """
     Process an incoming message from WhatsApp or Telegram.
@@ -947,8 +1183,7 @@ async def whatsapp_webhook(request: Request) -> JSONResponse:
     """
     WhatsApp webhook endpoint for receiving messages.
     
-    This endpoint should be configured in your WhatsApp Business API setup.
-    The exact payload format depends on your WhatsApp provider (e.g., Twilio, Meta, etc.)
+    Supports both Meta API and Twilio formats.
     
     Returns
     -------
@@ -957,10 +1192,33 @@ async def whatsapp_webhook(request: Request) -> JSONResponse:
     """
     try:
         payload = await request.json()
+        logger.info(f"WhatsApp webhook received: {payload}")
         
-        # Extract message data (this format may vary depending on your WhatsApp provider)
-        # Example for Twilio WhatsApp format:
-        if "messages" in payload:
+        # Meta API format
+        if "entry" in payload:
+            events = extract_whatsapp_events(payload)
+            for ev in events:
+                if ev["phone"] and ev["text"]:
+                    result = await process_incoming_message(
+                        phone=ev["phone"],
+                        message=ev["text"],
+                        source="whatsapp",
+                        external_id=ev["id"]
+                    )
+                    if result["status"] == "success":
+                        # Send automatic response if configured
+                        if result.get("response"):
+                            await send_whatsapp_message(ev["phone"], result["response"])
+                        return JSONResponse({
+                            "status": "processed",
+                            "athlete": result["athlete"]["name"],
+                            "response": result["response"]
+                        })
+                    else:
+                        return JSONResponse({"status": "error", "message": result["message"]}, status_code=400)
+        
+        # Twilio format (legacy)
+        elif "messages" in payload:
             for message_data in payload["messages"]:
                 phone = message_data.get("from", "").replace("whatsapp:", "")
                 message_text = message_data.get("text", {}).get("body", "")
@@ -968,31 +1226,27 @@ async def whatsapp_webhook(request: Request) -> JSONResponse:
                 
                 if phone and message_text:
                     result = await process_incoming_message(
-                        phone=phone,
-                        message=message_text,
-                        source="whatsapp",
+                        phone=phone, 
+                        message=message_text, 
+                        source="whatsapp", 
                         external_id=message_id
                     )
-                    
                     if result["status"] == "success":
+                        # Send automatic response if configured
+                        if result.get("response"):
+                            await send_whatsapp_message(phone, result["response"])
                         return JSONResponse({
-                            "status": "processed",
-                            "athlete": result["athlete"]["name"],
+                            "status": "processed", 
+                            "athlete": result["athlete"]["name"], 
                             "response": result["response"]
                         })
                     else:
-                        return JSONResponse({
-                            "status": "error",
-                            "message": result["message"]
-                        }, status_code=400)
+                        return JSONResponse({"status": "error", "message": result["message"]}, status_code=400)
         
-        # Handle webhook verification (common for WhatsApp webhooks)
-        if "hub.challenge" in payload or request.method == "GET":
-            return JSONResponse({"hub.challenge": payload.get("hub.challenge", "")})
-            
         return JSONResponse({"status": "no_message_found"})
         
     except Exception as e:
+        logger.error(f"Error processing WhatsApp webhook: {e}")
         return JSONResponse({
             "status": "error",
             "message": f"Webhook processing error: {str(e)}"
@@ -1137,7 +1391,120 @@ async def test_webhook(request: Request) -> JSONResponse:
         }, status_code=500)
 
 
-@app.get("/athletes/phone/{phone}")
+@app.get("/test/whatsapp-config")
+async def test_whatsapp_config() -> JSONResponse:
+    """Test endpoint to check WhatsApp configuration (Twilio or Meta)."""
+    
+    # Check Twilio configuration
+    twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
+    
+    # Check Meta configuration
+    meta_phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    meta_access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    
+    config_status = {
+        "twilio": {
+            "configured": bool(twilio_account_sid and twilio_auth_token and twilio_whatsapp_number),
+            "account_sid": twilio_account_sid[:10] + "..." if twilio_account_sid else None,
+            "auth_token": twilio_auth_token[:10] + "..." if twilio_auth_token else None,
+            "whatsapp_number": twilio_whatsapp_number
+        },
+        "meta": {
+            "configured": bool(meta_phone_id and meta_access_token),
+            "phone_id": meta_phone_id[:10] + "..." if meta_phone_id else None,
+            "access_token": meta_access_token[:10] + "..." if meta_access_token else None
+        },
+        "system_status": "working" if (twilio_account_sid and twilio_auth_token and twilio_whatsapp_number) or (meta_phone_id and meta_access_token) else "limited",
+        "message": "WhatsApp configured (Twilio or Meta)" if (twilio_account_sid and twilio_auth_token and twilio_whatsapp_number) or (meta_phone_id and meta_access_token) else "WhatsApp not configured - messages will be saved to database"
+    }
+    
+    # Test sending a message if any provider is configured
+    if config_status["system_status"] == "working":
+        try:
+            test_result = await send_whatsapp_message("+1234567890", "Test message from Elite CRM")
+            config_status["test_send_result"] = test_result
+        except Exception as e:
+            config_status["test_send_error"] = str(e)
+    else:
+        config_status["test_send_result"] = {"status": "skipped", "message": "No WhatsApp credentials configured"}
+    
+    return JSONResponse(config_status)
+
+
+@app.get("/system/status")
+async def system_status() -> JSONResponse:
+    """Get overall system status including WhatsApp configuration."""
+    phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    
+    # Check database connection
+    try:
+        with conn:
+            cursor = conn.execute("SELECT COUNT(*) FROM athletes")
+            athlete_count = cursor.fetchone()[0]
+        db_status = "connected"
+    except Exception as e:
+        db_status = "error"
+        athlete_count = 0
+    
+    # Check WhatsApp configuration (Twilio or Meta)
+    twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
+    
+    meta_phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    meta_access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
+    
+    whatsapp_configured = (twilio_account_sid and twilio_auth_token and twilio_whatsapp_number) or (meta_phone_id and meta_access_token)
+    
+    status = {
+        "system": {
+            "status": "operational",
+            "version": "1.0.0",
+            "database": db_status,
+            "athletes_count": athlete_count
+        },
+        "whatsapp": {
+            "configured": whatsapp_configured,
+            "twilio_configured": bool(twilio_account_sid and twilio_auth_token and twilio_whatsapp_number),
+            "meta_configured": bool(meta_phone_id and meta_access_token),
+            "status": "ready" if whatsapp_configured else "not_configured",
+            "message": "WhatsApp configured (Twilio or Meta)" if whatsapp_configured else "WhatsApp not configured - messages will be saved to database"
+        },
+        "features": {
+            "communication_hub": "enabled",
+            "athlete_management": "enabled",
+            "message_storage": "enabled",
+            "whatsapp_sending": "enabled" if whatsapp_configured else "disabled",
+            "email_sending": "planned",
+            "sms_sending": "planned"
+        },
+        "recommendations": []
+    }
+    
+    # Add recommendations based on current status
+    if not whatsapp_configured:
+        status["recommendations"].append({
+            "type": "whatsapp_setup",
+            "priority": "medium",
+            "message": "Configure WhatsApp (Twilio or Meta) for real message sending",
+            "action": "Follow the WhatsApp setup guide in WHATSAPP_SETUP_GUIDE.md"
+        })
+    
+    if athlete_count == 0:
+        status["recommendations"].append({
+            "type": "add_athletes",
+            "priority": "high",
+            "message": "Add your first athlete to start using the system",
+            "action": "Go to /athletes and add an athlete"
+        })
+    
+    return JSONResponse(status)
+
+
+@app.get("/api/athletes/phone/{phone}")
 async def find_athlete_by_phone_endpoint(phone: str) -> JSONResponse:
     """
     Find an athlete by phone number endpoint.
@@ -1406,7 +1773,7 @@ def generate_highlights_from_conversation(
 
 # API endpoints for athlete highlights
 
-@app.post("/athletes/{athlete_id}/highlights", response_class=JSONResponse)
+@app.post("/api/athletes/{athlete_id}/highlights", response_class=JSONResponse)
 async def create_highlight(
     athlete_id: int,
     highlight_text: str = Form(...),
@@ -1441,7 +1808,7 @@ async def create_highlight(
     return JSONResponse(result)
 
 
-@app.get("/athletes/{athlete_id}/highlights", response_class=JSONResponse)
+@app.get("/api/athletes/{athlete_id}/highlights", response_class=JSONResponse)
 async def get_highlights(
     athlete_id: int,
     active_only: bool = True,
@@ -1557,7 +1924,7 @@ async def delete_highlight_endpoint(highlight_id: int) -> JSONResponse:
     return JSONResponse(result)
 
 
-@app.post("/athletes/{athlete_id}/highlights/generate", response_class=JSONResponse)
+@app.post("/api/athletes/{athlete_id}/highlights/generate", response_class=JSONResponse)
 async def generate_highlights(
     athlete_id: int,
     conversation_id: int = Form(...),
