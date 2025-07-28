@@ -230,6 +230,133 @@ async def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/communication-hub", response_class=HTMLResponse)
+async def communication_hub(request: Request) -> HTMLResponse:
+    """Serve the omnichannel communication hub."""
+    return templates.TemplateResponse("communication_hub.html", {"request": request})
+
+
+@app.get("/communication-hub/athletes", response_class=JSONResponse)
+async def get_communication_athletes() -> JSONResponse:
+    """Get athletes for communication hub."""
+    with conn:
+        cursor = conn.execute(
+            """
+            SELECT a.id, a.name, a.email, a.phone, a.sport, a.level, a.created_at,
+                   COUNT(r.id) as total_conversations,
+                   MAX(r.timestamp) as last_conversation
+            FROM athletes a
+            LEFT JOIN records r ON a.id = r.athlete_id
+            GROUP BY a.id
+            ORDER BY a.name
+            """
+        )
+        athletes = cursor.fetchall()
+    
+    return JSONResponse({
+        "athletes": [
+            {
+                "id": a[0],
+                "name": a[1],
+                "email": a[2],
+                "phone": a[3],
+                "sport": a[4],
+                "level": a[5],
+                "created_at": a[6],
+                "total_conversations": a[7],
+                "last_conversation": a[8]
+            }
+            for a in athletes
+        ]
+    })
+
+
+@app.get("/communication-hub/athletes/{athlete_id}/conversations", response_class=JSONResponse)
+async def get_athlete_conversations(athlete_id: int) -> JSONResponse:
+    """Get all conversations for an athlete."""
+    with conn:
+        cursor = conn.execute(
+            """
+            SELECT r.id, r.timestamp, r.transcription, r.final_response, 
+                   r.category, r.priority, r.status, r.notes, r.source,
+                   r.external_message_id
+            FROM records r
+            WHERE r.athlete_id = ?
+            ORDER BY r.timestamp DESC
+            """,
+            (athlete_id,)
+        )
+        records = cursor.fetchall()
+    
+    return JSONResponse({
+        "conversations": [
+            {
+                "id": r[0],
+                "timestamp": r[1],
+                "transcription": r[2],
+                "final_response": r[3],
+                "category": r[4],
+                "priority": r[5],
+                "status": r[6],
+                "notes": r[7],
+                "source": r[8] if len(r) > 8 else "manual",
+                "external_message_id": r[9]
+            }
+            for r in records
+        ]
+    })
+
+
+@app.post("/communication-hub/send-message")
+async def send_communication_message(
+    athlete_id: int = Form(...),
+    message: str = Form(...),
+    platform: str = Form(...),
+    subject: str = Form("")
+) -> JSONResponse:
+    """Send a message to an athlete via specified platform."""
+    try:
+        timestamp = datetime.datetime.now().isoformat()
+        
+        # Save the outgoing message as a conversation record
+        with conn:
+            conn.execute(
+                """
+                INSERT INTO records (
+                    athlete_id, timestamp, transcription, generated_response,
+                    final_response, category, priority, notes, status, source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    athlete_id,
+                    timestamp,
+                    f"[OUTGOING via {platform.upper()}]: {message}",
+                    message,
+                    message,
+                    "outgoing",
+                    "medium",
+                    f"Sent via {platform}",
+                    "completed",
+                    platform
+                ),
+            )
+        
+        # In a real implementation, this would send the actual message
+        # via WhatsApp API, Telegram Bot API, or email service
+        
+        return JSONResponse({
+            "status": "sent",
+            "message": f"Message sent via {platform}",
+            "timestamp": timestamp
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "status": "error",
+            "message": f"Error sending message: {str(e)}"
+        }, status_code=500)
+
+
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)) -> JSONResponse:
     """

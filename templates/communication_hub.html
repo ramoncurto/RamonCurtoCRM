@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elite CRM • Omnichannel Communication Hub</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <style>
+        :root {
+            --primary-500: #6366f1;
+            --whatsapp: #25d366;
+            --telegram: #0088cc;
+            --email: #ea4335;
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --border-primary: #374151;
+            --success-500: #10b981;
+            --error-500: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
+
+        .communication-hub {
+            display: grid;
+            grid-template-columns: 320px 1fr 380px;
+            height: 100vh;
+        }
+
+        .customer-sidebar, .highlights-sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .highlights-sidebar { border-right: none; border-left: 1px solid var(--border-primary); }
+
+        .customer-header, .highlights-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .customer-profile {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .customer-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--whatsapp));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: white;
+        }
+
+        .customer-info h2 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+        .customer-details { font-size: 0.875rem; color: var(--text-secondary); }
+
+        .platform-indicators {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .platform-status {
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .platform-status.whatsapp { background: rgba(37, 211, 102, 0.1); color: var(--whatsapp); }
+        .platform-status.telegram { background: rgba(0, 136, 204, 0.1); color: var(--telegram); }
+        .platform-status.email { background: rgba(234, 67, 53, 0.1); color: var(--email); }
+
+        .timeline-section, .highlights-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .timeline-item {
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-radius: 0.75rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timeline-item:hover { background: var(--bg-surface); }
+
+        .timeline-platform {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .unified-chat {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-primary);
+        }
+
+        .chat-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+        }
+
+        .unified-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 75%;
+        }
+
+        .message.sent { align-self: flex-end; flex-direction: row-reverse; }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .message-bubble {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .message.sent .message-bubble {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .response-area {
+            border-top: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+        }
+
+        .platform-selector {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .platform-option {
+            padding: 0.75rem 1rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 0.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .platform-option.active {
+            color: white;
+            border-color: currentColor;
+        }
+
+        .platform-option.whatsapp.active { background: var(--whatsapp); }
+        .platform-option.telegram.active { background: var(--telegram); }
+        .platform-option.email.active { background: var(--email); }
+
+        .input-container {
+            position: relative;
+        }
+
+        .response-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-primary);
+            border-radius: 0.75rem;
+            color: var(--text-primary);
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .response-textarea:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+
+        .input-actions {
+            position: absolute;
+            right: 0.75rem;
+            bottom: 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-btn {
+            padding: 0.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .input-btn.send-btn {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .highlight-item {
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            border-left: 3px solid var(--primary-500);
+        }
+
+        .highlight-text {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .highlight-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .loading { opacity: 0.5; pointer-events: none; }
+        .error { color: var(--error-500); }
+        .success { color: var(--success-500); }
+
+        @media (max-width: 1024px) {
+            .communication-hub { grid-template-columns: 1fr 300px; }
+            .customer-sidebar { display: none; }
+        }
+
+        @media (max-width: 768px) {
+            .communication-hub { grid-template-columns: 1fr; }
+            .highlights-sidebar { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="communication-hub">
+        <!-- Left Sidebar - Athletes -->
+        <div class="customer-sidebar">
+            <div class="customer-header">
+                <h2 style="margin-bottom: 1rem;">Athletes</h2>
+                <select id="athleteSelect" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: 0.5rem; color: var(--text-primary);">
+                    <option value="">Select an athlete...</option>
+                </select>
+            </div>
+            <div class="timeline-section">
+                <div id="athleteDetails" style="padding: 1rem; display: none;">
+                    <h3 id="athleteName"></h3>
+                    <p id="athleteInfo" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
+                    <div class="platform-indicators">
+                        <div class="platform-status whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</div>
+                        <div class="platform-status telegram"><i class="fab fa-telegram"></i> Telegram</div>
+                        <div class="platform-status email"><i class="fas fa-envelope"></i> Email</div>
+                    </div>
+                </div>
+                <div id="conversationsList" style="padding: 1rem;">
+                    <p style="color: var(--text-secondary); text-align: center;">Select an athlete to view conversations</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unified Chat Area -->
+        <div class="unified-chat">
+            <div class="chat-header">
+                <h3>Omnichannel Communication</h3>
+                <div id="chatStatus" style="color: var(--text-secondary);">Select an athlete to start</div>
+            </div>
+            <div class="unified-messages" id="unifiedMessages">
+                <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view messages</p>
+            </div>
+            <div class="response-area">
+                <div class="platform-selector">
+                    <button class="platform-option whatsapp active" onclick="selectPlatform('whatsapp')">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </button>
+                    <button class="platform-option telegram" onclick="selectPlatform('telegram')">
+                        <i class="fab fa-telegram"></i> Telegram
+                    </button>
+                    <button class="platform-option email" onclick="selectPlatform('email')">
+                        <i class="fas fa-envelope"></i> Email
+                    </button>
+                </div>
+                <div class="input-container">
+                    <textarea class="response-textarea" id="responseInput" placeholder="Type your message..." rows="3"></textarea>
+                    <div class="input-actions">
+                        <button class="input-btn" onclick="attachFile()" title="Attach file">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <button class="input-btn send-btn" onclick="sendMessage()" title="Send message">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Highlights -->
+        <div class="highlights-sidebar">
+            <div class="highlights-header">
+                <h2>Highlights</h2>
+                <button onclick="extractHighlights()" style="width: 100%; padding: 0.5rem; background: var(--primary-500); color: white; border: none; border-radius: 0.5rem; margin-top: 0.5rem;">
+                    <i class="fas fa-highlighter"></i> Extract Highlights
+                </button>
+            </div>
+            <div class="highlights-content" id="highlightsContent">
+                <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view highlights</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentAthlete = null;
+        let currentPlatform = 'whatsapp';
+        let athletes = [];
+        let conversations = [];
+        let highlights = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadAthletes();
+            document.getElementById('athleteSelect').addEventListener('change', handleAthleteChange);
+        });
+
+        async function loadAthletes() {
+            try {
+                const response = await fetch('/communication-hub/athletes');
+                const data = await response.json();
+                athletes = data.athletes;
+                
+                const select = document.getElementById('athleteSelect');
+                athletes.forEach(athlete => {
+                    const option = document.createElement('option');
+                    option.value = athlete.id;
+                    option.textContent = athlete.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading athletes:', error);
+                showToast('Error loading athletes', 'error');
+            }
+        }
+
+        async function handleAthleteChange(event) {
+            const athleteId = event.target.value;
+            if (!athleteId) {
+                resetViews();
+                return;
+            }
+
+            currentAthlete = athletes.find(a => a.id == athleteId);
+            await loadAthleteData(athleteId);
+        }
+
+        async function loadAthleteData(athleteId) {
+            try {
+                // Load conversations
+                const convResponse = await fetch(`/communication-hub/athletes/${athleteId}/conversations`);
+                const convData = await convResponse.json();
+                conversations = convData.conversations;
+
+                // Load highlights
+                const highlightsResponse = await fetch(`/athletes/${athleteId}/highlights`);
+                const highlightsData = await highlightsResponse.json();
+                highlights = highlightsData.highlights;
+
+                displayAthleteDetails();
+                displayConversations();
+                displayHighlights();
+            } catch (error) {
+                console.error('Error loading athlete data:', error);
+                showToast('Error loading athlete data', 'error');
+            }
+        }
+
+        function displayAthleteDetails() {
+            if (!currentAthlete) return;
+
+            document.getElementById('athleteName').textContent = currentAthlete.name;
+            document.getElementById('athleteInfo').textContent = `${currentAthlete.sport} • ${currentAthlete.level}`;
+            document.getElementById('athleteDetails').style.display = 'block';
+            document.getElementById('chatStatus').textContent = `Chatting with ${currentAthlete.name}`;
+        }
+
+        function displayConversations() {
+            const container = document.getElementById('conversationsList');
+            const messagesContainer = document.getElementById('unifiedMessages');
+            
+            if (!conversations.length) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No conversations yet</p>';
+                messagesContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No messages yet</p>';
+                return;
+            }
+
+            container.innerHTML = conversations.map(conv => `
+                <div class="timeline-item" onclick="loadConversation(${conv.id})">
+                    <div class="timeline-platform ${conv.source || 'manual'}">
+                        <i class="fab fa-${conv.source || 'comments'}"></i>
+                        ${conv.source || 'Manual'}
+                    </div>
+                    <div class="timeline-message">${conv.transcription.substring(0, 100)}...</div>
+                    <div class="timeline-date">${new Date(conv.timestamp).toLocaleDateString()}</div>
+                </div>
+            `).join('');
+
+            messagesContainer.innerHTML = conversations.map(conv => `
+                <div class="message ${conv.transcription.startsWith('[OUTGOING') ? 'sent' : ''}">
+                    <div class="message-avatar">${currentAthlete.name.charAt(0)}</div>
+                    <div class="message-content">
+                        <div class="message-bubble">${conv.transcription}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                            ${new Date(conv.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                </div>
+            `).reverse().join('');
+        }
+
+        function displayHighlights() {
+            const container = document.getElementById('highlightsContent');
+            
+            if (!highlights.length) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No highlights yet</p>';
+                return;
+            }
+
+            container.innerHTML = highlights.map(highlight => `
+                <div class="highlight-item">
+                    <div class="highlight-text">${highlight.highlight_text}</div>
+                    <div class="highlight-meta">
+                        <span>${highlight.category}</span>
+                        <span>${new Date(highlight.created_at).toLocaleDateString()}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectPlatform(platform) {
+            currentPlatform = platform;
+            document.querySelectorAll('.platform-option').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.platform-option.${platform}`).classList.add('active');
+        }
+
+        async function sendMessage() {
+            if (!currentAthlete) {
+                showToast('Please select an athlete first', 'error');
+                return;
+            }
+
+            const message = document.getElementById('responseInput').value.trim();
+            if (!message) {
+                showToast('Please enter a message', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('athlete_id', currentAthlete.id);
+                formData.append('message', message);
+                formData.append('platform', currentPlatform);
+
+                const response = await fetch('/communication-hub/send-message', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'sent') {
+                    showToast('Message sent successfully', 'success');
+                    document.getElementById('responseInput').value = '';
+                    await loadAthleteData(currentAthlete.id);
+                } else {
+                    showToast('Error sending message', 'error');
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showToast('Error sending message', 'error');
+            }
+        }
+
+        async function extractHighlights() {
+            if (!currentAthlete || !conversations.length) {
+                showToast('No conversations to extract highlights from', 'error');
+                return;
+            }
+
+            try {
+                const latestConv = conversations[0];
+                const formData = new FormData();
+                formData.append('conversation_id', latestConv.id);
+                formData.append('transcription', latestConv.transcription);
+                formData.append('response', latestConv.final_response);
+
+                const response = await fetch(`/athletes/${currentAthlete.id}/highlights/generate`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showToast(`Generated ${result.count} highlights`, 'success');
+                    await loadAthleteData(currentAthlete.id);
+                } else {
+                    showToast('Error generating highlights', 'error');
+                }
+            } catch (error) {
+                console.error('Error extracting highlights:', error);
+                showToast('Error extracting highlights', 'error');
+            }
+        }
+
+        async function transcribeAudio(audioFile) {
+            if (!currentAthlete) {
+                showToast('Please select an athlete first', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', audioFile);
+
+            try {
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.transcription) {
+                    document.getElementById('responseInput').value = result.transcription;
+                    showToast('Audio transcribed successfully', 'success');
+                } else {
+                    showToast('Error transcribing audio', 'error');
+                }
+            } catch (error) {
+                console.error('Error transcribing audio:', error);
+                showToast('Error transcribing audio', 'error');
+            }
+        }
+
+        function attachFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'audio/*';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) transcribeAudio(file);
+            };
+            input.click();
+        }
+
+        function resetViews() {
+            currentAthlete = null;
+            conversations = [];
+            highlights = [];
+            document.getElementById('athleteDetails').style.display = 'none';
+            document.getElementById('conversationsList').innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Select an athlete to view conversations</p>';
+            document.getElementById('unifiedMessages').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view messages</p>';
+            document.getElementById('highlightsContent').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view highlights</p>';
+            document.getElementById('chatStatus').textContent = 'Select an athlete to start';
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                position: fixed;
+                top: 1rem;
+                right: 1rem;
+                padding: 1rem 1.5rem;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                border-radius: 0.5rem;
+                color: var(--text-primary);
+                z-index: 1000;
+                box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+                max-width: 300px;
+            `;
+            
+            if (type === 'error') {
+                toast.style.borderColor = 'var(--error-500)';
+                toast.style.color = 'var(--error-500)';
+            } else if (type === 'success') {
+                toast.style.borderColor = 'var(--success-500)';
+                toast.style.color = 'var(--success-500)';
+            }
+            
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            if (currentAthlete) {
+                loadAthleteData(currentAthlete.id);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
