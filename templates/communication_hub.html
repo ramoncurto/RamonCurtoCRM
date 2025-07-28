@@ -1,37 +1,161 @@
+<!--
+    Elite Athletes • Omnichannel Communication Hub (Integrated Version)
+
+    This template extends the original prototype from `communication_hub_design.html` and
+    wires it into the existing FastAPI backend. When placed inside your
+    project's `templates` directory and served via a new route (see
+    modifications to `main.py`), the hub will fetch real athlete data,
+    conversation history and highlights from your API endpoints. It also
+    provides a basic mechanism to send new responses which are persisted
+    through the `/save` endpoint. Audio transcription and voice recording
+    remain optional and can be enabled by reusing the existing `/transcribe`
+    and `/generate` endpoints.
+
+    To integrate:
+      1. Copy this file into your `templates` folder.
+      2. Add a route in `main.py` such as:
+
+         @app.get("/communication-hub", response_class=HTMLResponse)
+         async def communication_hub(request: Request) -> HTMLResponse:
+             return templates.TemplateResponse("communication_hub.html", {"request": request})
+
+      3. Add a navigation link to this page in your sidebar templates
+         (e.g. in `dashboard.html` and `history.html`) so it can be
+         accessed from the UI.
+
+      4. Ensure the `/athletes`, `/athletes/{id}`, `/athletes/{id}/history`,
+         `/athletes/{id}/highlights` and `/save` endpoints remain
+         functional. Optional features such as `/transcribe` and
+         `/generate` can be plugged into the voice and AI tools if desired.
+
+    Author: ChatGPT
+    Date: 2025-07-28
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Elite CRM • Omnichannel Communication Hub</title>
+    <!-- Font Awesome icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
+        /*
+            Most of the styling here is derived from the original design and
+            matches the colour palette used throughout the CRM dashboard. Feel
+            free to tweak these variables to align with your brand.
+        */
         :root {
+            /* Brand Colours */
             --primary-500: #6366f1;
+            --primary-600: #4f46e5;
+            --primary-700: #4338ca;
+            --secondary-500: #8b5cf6;
+            --secondary-600: #7c3aed;
+            
+            /* Platform Colours */
             --whatsapp: #25d366;
             --telegram: #0088cc;
+            --sms: #007aff;
             --email: #ea4335;
+            --phone: #34a853;
+            
+            /* Semantic Colours */
+            --success-50: #ecfdf5;
+            --success-500: #10b981;
+            --success-600: #059669;
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            --warning-600: #d97706;
+            --error-50: #fef2f2;
+            --error-500: #ef4444;
+            --error-600: #dc2626;
+            --info-50: #eff6ff;
+            --info-500: #3b82f6;
+            --info-600: #2563eb;
+            
+            /* Status Colours */
+            --online: #10b981;
+            --away: #f59e0b;
+            --busy: #ef4444;
+            --offline: #6b7280;
+            
+            /* Dark Theme */
             --bg-primary: #0a0e1a;
             --bg-secondary: #111827;
             --bg-tertiary: #1f2937;
+            --bg-surface: #374151;
+            --bg-overlay: rgba(17, 24, 39, 0.8);
+            --bg-chat: #0f172a;
+            
+            /* Text Colours */
             --text-primary: #f9fafb;
             --text-secondary: #d1d5db;
+            --text-tertiary: #9ca3af;
+            --text-quaternary: #6b7280;
+            
+            /* Borders */
             --border-primary: #374151;
-            --success-500: #10b981;
-            --error-500: #ef4444;
+            --border-secondary: #4b5563;
+            --border-focus: var(--primary-500);
+            
+            /* Shadows */
+            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            
+            /* Spacing */
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-5: 1.25rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-10: 2.5rem;
+            --space-12: 3rem;
+            --space-16: 4rem;
+            
+            /* Border Radius */
+            --radius-sm: 0.25rem;
+            --radius-md: 0.375rem;
+            --radius-lg: 0.5rem;
+            --radius-xl: 0.75rem;
+            --radius-2xl: 1rem;
+            --radius-3xl: 1.5rem;
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; }
-
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        /* Main Layout */
         .communication-hub {
             display: grid;
             grid-template-columns: 320px 1fr 380px;
+            grid-template-rows: 100vh;
             height: 100vh;
         }
 
-        .customer-sidebar, .highlights-sidebar {
+        /* Left Sidebar - Customer & Timeline */
+        .customer-sidebar {
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-primary);
             display: flex;
@@ -39,10 +163,23 @@
             overflow: hidden;
         }
 
-        .highlights-sidebar { border-right: none; border-left: 1px solid var(--border-primary); }
+        /* Unified Chat Area */
+        .unified-chat {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-chat);
+        }
 
-        .customer-header, .highlights-header {
-            padding: 1.5rem;
+        /* Right Sidebar - Highlights & AI */
+        .highlights-sidebar {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+        }
+        /* Customer Header */
+        .customer-header {
+            padding: var(--space-6);
             border-bottom: 1px solid var(--border-primary);
             background: var(--bg-tertiary);
         }
@@ -50,98 +187,335 @@
         .customer-profile {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
         }
 
         .customer-avatar {
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-500), var(--whatsapp));
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 1.5rem;
             font-weight: 700;
             color: white;
+            position: relative;
         }
 
-        .customer-info h2 { font-size: 1.25rem; margin-bottom: 0.25rem; }
-        .customer-details { font-size: 0.875rem; color: var(--text-secondary); }
+        .status-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-tertiary);
+            background: var(--online);
+            animation: pulse 2s infinite;
+        }
 
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .customer-info h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--space-1);
+        }
+
+        .customer-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .tier-badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid #fbbf24;
+        }
         .platform-indicators {
             display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
+            gap: var(--space-2);
+            margin-top: var(--space-4);
         }
 
         .platform-status {
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
             font-size: 0.75rem;
             font-weight: 600;
         }
 
-        .platform-status.whatsapp { background: rgba(37, 211, 102, 0.1); color: var(--whatsapp); }
-        .platform-status.telegram { background: rgba(0, 136, 204, 0.1); color: var(--telegram); }
-        .platform-status.email { background: rgba(234, 67, 53, 0.1); color: var(--email); }
+        .platform-status.whatsapp {
+            color: var(--whatsapp);
+            background: rgba(37, 211, 102, 0.1);
+        }
 
-        .timeline-section, .highlights-content {
+        .platform-status.telegram {
+            color: var(--telegram);
+            background: rgba(0, 136, 204, 0.1);
+        }
+
+        .platform-status.email {
+            color: var(--email);
+            background: rgba(234, 67, 53, 0.1);
+        }
+
+        .platform-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        /* Conversation Timeline */
+        .timeline-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .timeline-header {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .timeline-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-3);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .timeline-filters {
+            display: flex;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: var(--space-1) var(--space-3);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 9999px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .timeline-content {
             flex: 1;
             overflow-y: auto;
-            padding: 1rem;
+            padding: var(--space-4);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: var(--space-6);
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border-primary);
         }
 
         .timeline-item {
-            padding: 1rem;
-            background: var(--bg-tertiary);
-            border-radius: 0.75rem;
-            margin-bottom: 0.75rem;
+            position: relative;
+            padding-bottom: var(--space-4);
+            margin-bottom: var(--space-4);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all var(--transition-fast);
         }
 
-        .timeline-item:hover { background: var(--bg-surface); }
+        .timeline-item:hover {
+            transform: translateX(2px);
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            border: 2px solid var(--bg-tertiary);
+            z-index: 1;
+        }
+
+        .timeline-item.whatsapp::before { background: var(--whatsapp); }
+        .timeline-item.telegram::before { background: var(--telegram); }
+        .timeline-item.email::before { background: var(--email); }
+        .timeline-item.phone::before { background: var(--phone); }
+
+        .timeline-content-item {
+            background: var(--bg-tertiary);
+            padding: var(--space-4);
+            border-radius: var(--radius-xl);
+            margin-left: var(--space-4);
+            transition: all var(--transition-fast);
+        }
+
+        .timeline-content-item:hover {
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-md);
+        }
+
+        .timeline-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
 
         .timeline-platform {
-            display: inline-flex;
+            display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0.5rem;
+            gap: var(--space-2);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 9999px;
+        }
+
+        .timeline-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+        .timeline-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+        .timeline-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+        .timeline-platform.phone { background: rgba(52, 168, 83, 0.2); color: var(--phone); }
+
+        .timeline-date {
+            font-size: 0.75rem;
+            color: var(--text-quaternary);
+        }
+
+        .timeline-message {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: var(--space-2);
+        }
+
+        /* Chat Header */
+        .chat-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+        }
+
+        .omnichannel-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+        }
+
+        .chat-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chat-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-500);
             border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
         }
 
-        .unified-chat {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-primary);
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success-500);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
         }
-
-        .chat-header {
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border-primary);
-            background: var(--bg-secondary);
-        }
-
+        /* Unified Messages */
         .unified-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
+            padding: var(--space-6);
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: var(--space-4);
         }
 
         .message {
             display: flex;
-            gap: 0.75rem;
+            gap: var(--space-3);
             max-width: 75%;
         }
 
-        .message.sent { align-self: flex-end; flex-direction: row-reverse; }
+        .message.sent {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
 
         .message-avatar {
             width: 32px;
@@ -153,498 +527,1538 @@
             font-size: 0.75rem;
             font-weight: 600;
             color: white;
+            flex-shrink: 0;
+        }
+
+        .message.sent .message-avatar {
+            background: var(--bg-surface);
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+
+        .message-sender {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .message-platform {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+        }
+
+        .message-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+        .message-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+        .message-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-quaternary);
         }
 
         .message-bubble {
-            padding: 1rem;
-            border-radius: 0.75rem;
+            padding: var(--space-4);
+            border-radius: var(--radius-xl);
             background: var(--bg-secondary);
             border: 1px solid var(--border-primary);
             color: var(--text-primary);
             line-height: 1.5;
+            position: relative;
         }
 
         .message.sent .message-bubble {
             background: var(--primary-500);
             color: white;
-        }
-
-        .response-area {
-            border-top: 1px solid var(--border-primary);
-            background: var(--bg-secondary);
-            padding: 1.5rem;
-        }
-
-        .platform-selector {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .platform-option {
-            padding: 0.75rem 1rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-primary);
-            border-radius: 0.5rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .platform-option.active {
-            color: white;
-            border-color: currentColor;
-        }
-
-        .platform-option.whatsapp.active { background: var(--whatsapp); }
-        .platform-option.telegram.active { background: var(--telegram); }
-        .platform-option.email.active { background: var(--email); }
-
-        .input-container {
-            position: relative;
-        }
-
-        .response-textarea {
-            width: 100%;
-            min-height: 80px;
-            padding: 1rem;
-            background: var(--bg-tertiary);
-            border: 2px solid var(--border-primary);
-            border-radius: 0.75rem;
-            color: var(--text-primary);
-            resize: vertical;
-            font-family: inherit;
-        }
-
-        .response-textarea:focus {
-            outline: none;
             border-color: var(--primary-500);
         }
 
-        .input-actions {
-            position: absolute;
-            right: 0.75rem;
-            bottom: 0.75rem;
+        .message.whatsapp .message-avatar {
+            background: var(--whatsapp);
+        }
+
+        .message.telegram .message-avatar {
+            background: var(--telegram);
+        }
+
+        .message.email .message-avatar {
+            background: var(--email);
+        }
+        /* Response area */
+        .response-area {
+            border-top: 1px solid var(--border-primary);
+            padding: var(--space-6);
+            background: var(--bg-tertiary);
+        }
+        .platform-selector {
+            margin-bottom: var(--space-4);
+        }
+        .selector-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: var(--space-2);
+        }
+        .platform-options {
             display: flex;
-            gap: 0.5rem;
+            gap: var(--space-2);
         }
-
-        .input-btn {
-            padding: 0.5rem;
-            border: none;
-            border-radius: 0.5rem;
-            background: var(--bg-surface);
-            color: var(--text-secondary);
+        .platform-option {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
             cursor: pointer;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-secondary);
         }
-
-        .input-btn.send-btn {
+        .platform-option.active {
+            border-color: var(--primary-500);
             background: var(--primary-500);
             color: white;
         }
-
-        .highlight-item {
-            padding: 0.75rem;
+        /* Input tools */
+        .input-tools {
+            display: flex;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+        .tool-btn {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-md);
+            font-size: 0.75rem;
+            border: 1px solid var(--border-primary);
             background: var(--bg-tertiary);
-            border-radius: 0.5rem;
-            margin-bottom: 0.5rem;
-            border-left: 3px solid var(--primary-500);
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .tool-btn.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+        .voice-recording {
+            display: none;
+            align-items: center;
+            gap: var(--space-2);
+            background: var(--bg-chat);
+            border: 1px solid var(--border-primary);
+            padding: var(--space-2);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-2);
+        }
+        .recording-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error-500);
+            animation: blink 1s linear infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+        .recording-time { font-size: 0.75rem; color: var(--text-tertiary); }
+        .recording-controls {
+            display: flex;
+            gap: var(--space-2);
+        }
+        .recording-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            padding: 0.25rem 0.5rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        .recording-btn.stop { color: var(--error-500); }
+        /* Email fields */
+        .email-fields {
+            display: none;
+            margin-bottom: var(--space-2);
+        }
+        .email-subject {
+            width: 100%;
+            padding: var(--space-3);
+            background: var(--bg-chat);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+        /* Input area */
+        .input-container {
+            display: flex;
+            position: relative;
+        }
+        .response-textarea {
+            flex: 1;
+            padding: var(--space-4);
+            background: var(--bg-chat);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 3rem;
+            font-size: 0.875rem;
+        }
+        .input-actions {
+            position: absolute;
+            right: var(--space-3);
+            bottom: var(--space-3);
+            display: flex;
+            gap: var(--space-2);
+        }
+        .input-btn {
+            background: transparent;
+            border: none;
+            color: var(--primary-500);
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .input-btn.send-btn {
+            color: var(--primary-600);
+        }
+        /* Highlights sidebar */
+        .highlights-header {
+            padding: var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+        }
+        .highlights-title {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: var(--space-1);
+        }
+        .highlights-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .highlights-tabs {
+            display: flex;
+            gap: var(--space-1);
+            margin-top: var(--space-4);
+        }
+
+        .highlight-tab {
+            padding: var(--space-2) var(--space-3);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .highlight-tab:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .highlight-tab.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .highlights-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-6);
+        }
+        /* Compact Keynote‑style Highlights */
+        .highlight-item {
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-2);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            position: relative;
+            border-left: 2px solid var(--primary-500);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            min-height: 40px;
+        }
+
+        .highlight-item:hover {
+            background: var(--bg-surface);
+            transform: translateX(1px);
+        }
+
+        .highlight-bullet {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            flex-shrink: 0;
+        }
+
+        .highlight-content {
+            flex: 1;
+            min-width: 0;
         }
 
         .highlight-text {
-            font-size: 0.875rem;
-            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+            font-weight: 500;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .highlight-meta {
             display: flex;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
+            align-items: center;
+            gap: var(--space-2);
+            margin-left: auto;
+            flex-shrink: 0;
         }
 
-        .loading { opacity: 0.5; pointer-events: none; }
-        .error { color: var(--error-500); }
-        .success { color: var(--success-500); }
+        .highlight-category {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary-500);
+        }
+
+        .highlight-time {
+            font-size: 0.65rem;
+            color: var(--text-quaternary);
+            font-weight: 500;
+        }
+
+        /* Category‑specific colours */
+        .highlight-item.nutrition {
+            border-left-color: var(--warning-500);
+        }
+
+        .highlight-item.nutrition .highlight-bullet {
+            background: var(--warning-500);
+        }
+
+        .highlight-item.nutrition .highlight-category {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning-500);
+        }
+
+        .highlight-item.achievement {
+            border-left-color: var(--success-500);
+        }
+
+        .highlight-item.achievement .highlight-bullet {
+            background: var(--success-500);
+        }
+
+        .highlight-item.achievement .highlight-category {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-500);
+        }
+
+        .highlight-item.question {
+            border-left-color: var(--info-500);
+        }
+
+        .highlight-item.question .highlight-bullet {
+            background: var(--info-500);
+        }
+
+        .highlight-item.question .highlight-category {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--info-500);
+        }
+
+        .highlight-item.concern {
+            border-left-color: var(--error-500);
+        }
+
+        .highlight-item.concern .highlight-bullet {
+            background: var(--error-500);
+        }
+
+        .highlight-item.concern .highlight-category {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error-500);
+        }
+        .ai-highlight-suggestion {
+            background: var(--bg-tertiary);
+            padding: var(--space-4);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-primary);
+        }
+        .ai-suggestion-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var(--space-2);
+        }
+        .ai-suggestion-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: var(--radius-sm);
+            background: var(--primary-500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.875rem;
+        }
+        .ai-suggestion-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .ai-suggestion-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: var(--space-3);
+        }
+        .ai-suggestion-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+        .ai-suggestion-btn {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            border: 1px solid var(--primary-500);
+            background: var(--primary-500);
+            color: white;
+        }
+        .ai-suggestion-btn.secondary {
+            background: transparent;
+            color: var(--primary-500);
+        }
+        /* Notification */
+        .auto-highlight-notification {
+            position: fixed;
+            bottom: var(--space-6);
+            right: var(--space-6);
+            background: var(--primary-500);
+            color: white;
+            padding: var(--space-4);
+            border-radius: var(--radius-lg);
+            display: none;
+            box-shadow: var(--shadow-lg);
+            z-index: 100;
+        }
+        
+        /* Dynamic notifications */
+        .notification {
+            position: fixed;
+            top: var(--space-6);
+            right: var(--space-6);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            padding: var(--space-4);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            border-left: 4px solid var(--primary-500);
+            min-width: 300px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            border-left-color: var(--success-500);
+        }
+        
+        .notification.error {
+            border-left-color: var(--error-500);
+        }
+        
+        .notification.info {
+            border-left-color: var(--info-500);
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-overlay);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            width: 90%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--border-primary);
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: var(--space-2);
+            border-radius: var(--radius-md);
+            transition: all 0.2s ease;
+        }
+        
+        .modal-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .modal-body {
+            padding: var(--space-4);
+        }
+        
+        .form-group {
+            margin-bottom: var(--space-4);
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: var(--space-2);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: var(--space-3);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease;
+        }
+        
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+        
+        .form-actions {
+            display: flex;
+            gap: var(--space-3);
+            justify-content: flex-end;
+            margin-top: var(--space-4);
+        }
+        
+        .btn-primary,
+        .btn-secondary {
+            padding: var(--space-3) var(--space-4);
+            border-radius: var(--radius-md);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: var(--primary-500);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-600);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--bg-overlay);
+        }
+        
+        .notification-content {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+        }
+        .notification-icon {
+            font-size: 1.25rem;
+        }
+        .notification-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .notification-description {
+            font-size: 0.75rem;
+        }
+        /* Responsive Design */
+        @media (max-width: 1400px) {
+            .communication-hub {
+                grid-template-columns: 300px 1fr 350px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .communication-hub {
+                grid-template-columns: 280px 1fr 320px;
+            }
+        }
 
         @media (max-width: 1024px) {
-            .communication-hub { grid-template-columns: 1fr 300px; }
-            .customer-sidebar { display: none; }
+            .communication-hub {
+                grid-template-columns: 1fr 300px;
+            }
+            
+            .customer-sidebar {
+                display: none;
+            }
         }
 
         @media (max-width: 768px) {
-            .communication-hub { grid-template-columns: 1fr; }
-            .highlights-sidebar { display: none; }
+            .communication-hub {
+                grid-template-columns: 1fr;
+            }
+            
+            .highlights-sidebar {
+                display: none;
+            }
+        }
+
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .animate-highlight {
+            animation: highlightFlash 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes highlightFlash {
+            0% { background: rgba(99, 102, 241, 0.3); }
+            100% { background: var(--bg-tertiary); }
         }
     </style>
 </head>
 <body>
     <div class="communication-hub">
-        <!-- Left Sidebar - Athletes -->
+        <!-- Customer / athlete sidebar -->
         <div class="customer-sidebar">
             <div class="customer-header">
-                <h2 style="margin-bottom: 1rem;">Athletes</h2>
-                <select id="athleteSelect" style="width: 100%; padding: 0.5rem; background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: 0.5rem; color: var(--text-primary);">
-                    <option value="">Select an athlete...</option>
-                </select>
-            </div>
-            <div class="timeline-section">
-                <div id="athleteDetails" style="padding: 1rem; display: none;">
-                    <h3 id="athleteName"></h3>
-                    <p id="athleteInfo" style="color: var(--text-secondary); font-size: 0.875rem;"></p>
-                    <div class="platform-indicators">
-                        <div class="platform-status whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</div>
-                        <div class="platform-status telegram"><i class="fab fa-telegram"></i> Telegram</div>
-                        <div class="platform-status email"><i class="fas fa-envelope"></i> Email</div>
+                <div class="customer-profile">
+                    <div class="customer-avatar" id="customerAvatar">AA
+                        <div class="status-indicator" id="customerStatus"></div>
                     </div>
-                </div>
-                <div id="conversationsList" style="padding: 1rem;">
-                    <p style="color: var(--text-secondary); text-align: center;">Select an athlete to view conversations</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Unified Chat Area -->
-        <div class="unified-chat">
-            <div class="chat-header">
-                <h3>Omnichannel Communication</h3>
-                <div id="chatStatus" style="color: var(--text-secondary);">Select an athlete to start</div>
-            </div>
-            <div class="unified-messages" id="unifiedMessages">
-                <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view messages</p>
-            </div>
-            <div class="response-area">
-                <div class="platform-selector">
-                    <button class="platform-option whatsapp active" onclick="selectPlatform('whatsapp')">
-                        <i class="fab fa-whatsapp"></i> WhatsApp
-                    </button>
-                    <button class="platform-option telegram" onclick="selectPlatform('telegram')">
-                        <i class="fab fa-telegram"></i> Telegram
-                    </button>
-                    <button class="platform-option email" onclick="selectPlatform('email')">
-                        <i class="fas fa-envelope"></i> Email
-                    </button>
-                </div>
-                <div class="input-container">
-                    <textarea class="response-textarea" id="responseInput" placeholder="Type your message..." rows="3"></textarea>
-                    <div class="input-actions">
-                        <button class="input-btn" onclick="attachFile()" title="Attach file">
-                            <i class="fas fa-paperclip"></i>
-                        </button>
-                        <button class="input-btn send-btn" onclick="sendMessage()" title="Send message">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Sidebar - Highlights -->
-        <div class="highlights-sidebar">
-            <div class="highlights-header">
-                <h2>Highlights</h2>
-                <button onclick="extractHighlights()" style="width: 100%; padding: 0.5rem; background: var(--primary-500); color: white; border: none; border-radius: 0.5rem; margin-top: 0.5rem;">
-                    <i class="fas fa-highlighter"></i> Extract Highlights
-                </button>
-            </div>
-            <div class="highlights-content" id="highlightsContent">
-                <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view highlights</p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let currentAthlete = null;
-        let currentPlatform = 'whatsapp';
-        let athletes = [];
-        let conversations = [];
-        let highlights = [];
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadAthletes();
-            document.getElementById('athleteSelect').addEventListener('change', handleAthleteChange);
-        });
-
-        async function loadAthletes() {
-            try {
-                const response = await fetch('/communication-hub/athletes');
-                const data = await response.json();
-                athletes = data.athletes;
-                
-                const select = document.getElementById('athleteSelect');
-                athletes.forEach(athlete => {
-                    const option = document.createElement('option');
-                    option.value = athlete.id;
-                    option.textContent = athlete.name;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading athletes:', error);
-                showToast('Error loading athletes', 'error');
-            }
-        }
-
-        async function handleAthleteChange(event) {
-            const athleteId = event.target.value;
-            if (!athleteId) {
-                resetViews();
-                return;
-            }
-
-            currentAthlete = athletes.find(a => a.id == athleteId);
-            await loadAthleteData(athleteId);
-        }
-
-        async function loadAthleteData(athleteId) {
-            try {
-                // Load conversations
-                const convResponse = await fetch(`/communication-hub/athletes/${athleteId}/conversations`);
-                const convData = await convResponse.json();
-                conversations = convData.conversations;
-
-                // Load highlights
-                const highlightsResponse = await fetch(`/athletes/${athleteId}/highlights`);
-                const highlightsData = await highlightsResponse.json();
-                highlights = highlightsData.highlights;
-
-                displayAthleteDetails();
-                displayConversations();
-                displayHighlights();
-            } catch (error) {
-                console.error('Error loading athlete data:', error);
-                showToast('Error loading athlete data', 'error');
-            }
-        }
-
-        function displayAthleteDetails() {
-            if (!currentAthlete) return;
-
-            document.getElementById('athleteName').textContent = currentAthlete.name;
-            document.getElementById('athleteInfo').textContent = `${currentAthlete.sport} • ${currentAthlete.level}`;
-            document.getElementById('athleteDetails').style.display = 'block';
-            document.getElementById('chatStatus').textContent = `Chatting with ${currentAthlete.name}`;
-        }
-
-        function displayConversations() {
-            const container = document.getElementById('conversationsList');
-            const messagesContainer = document.getElementById('unifiedMessages');
-            
-            if (!conversations.length) {
-                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No conversations yet</p>';
-                messagesContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No messages yet</p>';
-                return;
-            }
-
-            container.innerHTML = conversations.map(conv => `
-                <div class="timeline-item" onclick="loadConversation(${conv.id})">
-                    <div class="timeline-platform ${conv.source || 'manual'}">
-                        <i class="fab fa-${conv.source || 'comments'}"></i>
-                        ${conv.source || 'Manual'}
-                    </div>
-                    <div class="timeline-message">${conv.transcription.substring(0, 100)}...</div>
-                    <div class="timeline-date">${new Date(conv.timestamp).toLocaleDateString()}</div>
-                </div>
-            `).join('');
-
-            messagesContainer.innerHTML = conversations.map(conv => `
-                <div class="message ${conv.transcription.startsWith('[OUTGOING') ? 'sent' : ''}">
-                    <div class="message-avatar">${currentAthlete.name.charAt(0)}</div>
-                    <div class="message-content">
-                        <div class="message-bubble">${conv.transcription}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                            ${new Date(conv.timestamp).toLocaleString()}
+                    <div class="customer-info">
+                        <h2 id="customerName">Athlete Name</h2>
+                        <div class="customer-details">
+                            <span class="tier-badge" id="customerTier">Level</span>
+                            <span id="customerSport">Sport</span>
                         </div>
                     </div>
                 </div>
-            `).reverse().join('');
-        }
-
-        function displayHighlights() {
-            const container = document.getElementById('highlightsContent');
-            
-            if (!highlights.length) {
-                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No highlights yet</p>';
-                return;
-            }
-
-            container.innerHTML = highlights.map(highlight => `
-                <div class="highlight-item">
-                    <div class="highlight-text">${highlight.highlight_text}</div>
-                    <div class="highlight-meta">
-                        <span>${highlight.category}</span>
-                        <span>${new Date(highlight.created_at).toLocaleDateString()}</span>
+                <div class="platform-indicators">
+                    <!-- Dynamically populated with available platforms for this athlete -->
+                </div>
+            </div>
+            <div class="timeline-section">
+                <div class="timeline-header">
+                    <div class="timeline-title">
+                        <i class="fas fa-history"></i>
+                        All Conversations
+                    </div>
+                    
+                    <div class="timeline-filters">
+                        <button class="filter-btn active" onclick="filterTimeline('all')">All</button>
+                        <button class="filter-btn" onclick="filterTimeline('today')">Today</button>
+                        <button class="filter-btn" onclick="filterTimeline('week')">Week</button>
+                        <button class="filter-btn" onclick="filterTimeline('whatsapp')">WhatsApp</button>
+                        <button class="filter-btn" onclick="filterTimeline('telegram')">Telegram</button>
+                        <button class="filter-btn" onclick="filterTimeline('email')">Email</button>
                     </div>
                 </div>
-            `).join('');
+
+                <div class="timeline-content">
+                    <div class="timeline" id="timelineList">
+                        <!-- Timeline items will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Unified chat area -->
+        <div class="unified-chat">
+            <div class="chat-header">
+                <div class="chat-info">
+                    <div class="omnichannel-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div>
+                        <div class="chat-title">Omnichannel Conversation</div>
+                        <div class="chat-subtitle">All platforms in one view</div>
+                    </div>
+                </div>
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Live</span>
+                </div>
+            </div>
+            <div class="unified-messages" id="unifiedMessages">
+                <!-- Messages will be injected here -->
+            </div>
+            <div class="response-area">
+                <div class="platform-selector">
+                    <div class="selector-title">Choose Response Platform</div>
+                    <div class="platform-options">
+                        <button class="platform-option whatsapp active" onclick="selectResponsePlatform('whatsapp')" id="whatsappOption">
+                            <i class="fab fa-whatsapp"></i><span>WhatsApp</span>
+                        </button>
+                        <button class="platform-option telegram" onclick="selectResponsePlatform('telegram')" id="telegramOption">
+                            <i class="fab fa-telegram-plane"></i><span>Telegram</span>
+                        </button>
+                        <button class="platform-option email" onclick="selectResponsePlatform('email')" id="emailOption">
+                            <i class="fas fa-envelope"></i><span>Email</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="response-input">
+                    <div class="input-tools">
+                        <button class="tool-btn active" onclick="toggleAI()" id="aiToggle">
+                            <i class="fas fa-robot"></i> AI Assist
+                        </button>
+                        <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceRecording()">
+                            <i class="fas fa-microphone"></i> Voice
+                        </button>
+                        <button class="tool-btn" onclick="loadTemplate()">
+                            <i class="fas fa-file-alt"></i> Templates
+                        </button>
+                        <button class="tool-btn" onclick="addEmoji()">
+                            <i class="fas fa-smile"></i> Emoji
+                        </button>
+                        <button class="tool-btn" onclick="translateText()">
+                            <i class="fas fa-language"></i> Translate
+                        </button>
+                        <button class="tool-btn" onclick="extractHighlights()">
+                            <i class="fas fa-highlighter"></i> Extract Highlights
+                        </button>
+                    </div>
+                    <div class="voice-recording" id="voiceRecording">
+                        <div class="recording-indicator"></div>
+                        <span>Recording...</span>
+                        <div class="recording-time" id="recordingTime">00:00</div>
+                        <div class="recording-controls">
+                            <button class="recording-btn" onclick="pauseRecording()">
+                                <i class="fas fa-pause"></i>
+                            </button>
+                            <button class="recording-btn stop" onclick="stopRecording()">
+                                <i class="fas fa-stop"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="email-fields" id="emailFields">
+                        <input type="text" class="email-subject" placeholder="Email Subject" id="emailSubject">
+                    </div>
+                    <div class="input-container">
+                        <textarea class="response-textarea" id="responseInput" placeholder="Type your response..." rows="4" onkeydown="handleKeyPress(event)" oninput="handleInputChange()"></textarea>
+                        <div class="input-actions">
+                            <button class="input-btn" title="Attach File" onclick="attachFile()">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button class="input-btn" id="recordBtn" title="Voice Message" onclick="toggleVoiceRecording()">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button class="input-btn send-btn" title="Send Message" onclick="sendResponse()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Highlights sidebar -->
+        <div class="highlights-sidebar">
+            <div class="highlights-header">
+                <div class="highlights-title">
+                    <i class="fas fa-highlighter"></i>
+                    Conversation Highlights
+                </div>
+                <p class="highlights-subtitle">Auto-extracted insights & key points</p>
+                
+                <div class="highlights-tabs">
+                    <button class="highlight-tab active" onclick="switchHighlightTab('auto')">Auto</button>
+                    <button class="highlight-tab" onclick="switchHighlightTab('manual')">Manual</button>
+                    <button class="highlight-tab" onclick="switchHighlightTab('ai')">AI Suggest</button>
+                </div>
+            </div>
+
+            <div class="highlights-content" id="highlightsContent">
+                <!-- Highlight items injected here -->
+            </div>
+        </div>
+    </div>
+    <!-- Notification for highlights extraction -->
+    <div class="auto-highlight-notification" id="highlightNotification">
+        <div class="notification-content">
+            <div class="notification-icon"><i class="fas fa-highlighter"></i></div>
+            <div class="notification-body">
+                <div class="notification-title">New Highlight Extracted</div>
+                <div class="notification-description">AI found a new key point</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Manual Highlight Modal -->
+    <div class="modal-overlay" id="highlightModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Create Manual Highlight</h3>
+                <button class="modal-close" onclick="closeHighlightModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="highlightForm">
+                    <div class="form-group">
+                        <label for="highlightText">Highlight Text</label>
+                        <textarea id="highlightText" placeholder="Enter the key point or summary..." rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="highlightCategory">Category</label>
+                        <select id="highlightCategory" required>
+                            <option value="general">General</option>
+                            <option value="nutrition">Nutrition</option>
+                            <option value="training">Training</option>
+                            <option value="achievement">Achievement</option>
+                            <option value="goal">Goal</option>
+                            <option value="concern">Concern</option>
+                            <option value="question">Question</option>
+                            <option value="feedback">Feedback</option>
+                        </select>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" onclick="closeHighlightModal()">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Highlight</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script>
+        /*
+         * This script adds dynamic behaviour to the communication hub by
+         * interacting with your FastAPI backend. It fetches athlete data,
+         * conversation history and highlights, and persists new responses.
+         */
+        let currentAthleteId = null;
+        let currentPlatform = 'whatsapp';
+        let aiAssistActive = true;
+        
+        // Voice recording variables
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let recordingStartTime = null;
+        let recordingTimer = null;
+
+        async function initializeHub() {
+            try {
+                // Get list of athletes and pick the first by default
+                const athletesRes = await fetch('/athletes');
+                const athletesData = await athletesRes.json();
+                if (!athletesData.athletes || athletesData.athletes.length === 0) {
+                    console.warn('No athletes found. Please add some athletes via the dashboard.');
+                    return;
+                }
+                // Select the first athlete for demonstration. In future this could
+                // be replaced with a selector component.
+                currentAthleteId = athletesData.athletes[0].id;
+                await loadAthlete(currentAthleteId);
+            } catch (err) {
+                console.error('Error initializing hub:', err);
+            }
         }
 
-        function selectPlatform(platform) {
+        async function loadAthlete(athleteId) {
+            try {
+                currentAthleteId = athleteId;
+                // Fetch athlete details
+                const profileRes = await fetch(`/athletes/${athleteId}`);
+                const profile = await profileRes.json();
+                if (profile && profile.name) {
+                    updateCustomerSidebar(profile);
+                }
+                // Fetch conversation history
+                const historyRes = await fetch(`/athletes/${athleteId}/history`);
+                const historyData = await historyRes.json();
+                const history = historyData.history || [];
+                updateTimeline(history);
+                updateMessages(history);
+                // Load all highlights
+                await loadAllHighlights();
+            } catch (err) {
+                console.error('Error loading athlete:', err);
+            }
+        }
+
+        function updateCustomerSidebar(profile) {
+            const nameEl = document.getElementById('customerName');
+            const sportEl = document.getElementById('customerSport');
+            const tierEl = document.getElementById('customerTier');
+            const avatarEl = document.getElementById('customerAvatar');
+            const statusEl = document.getElementById('customerStatus');
+            // Set initials as avatar content
+            const initials = profile.name.split(' ').map(n => n[0]).join('');
+            avatarEl.innerText = initials;
+            // Example status: online if last updated within 24h
+            statusEl.style.background = profile.phone ? 'var(--online)' : 'var(--offline)';
+            nameEl.innerText = profile.name;
+            sportEl.innerText = profile.sport || '';
+            tierEl.innerText = profile.level || '';
+            // Platform indicators (phones + email)
+            const indicators = document.querySelector('.platform-indicators');
+            indicators.innerHTML = '';
+            if (profile.phone) {
+                const whatsappStatus = document.createElement('div');
+                whatsappStatus.className = 'platform-status whatsapp';
+                whatsappStatus.innerHTML = '<div class="platform-dot"></div><span>WhatsApp</span>';
+                indicators.appendChild(whatsappStatus);
+            }
+            if (profile.phone) {
+                const telegramStatus = document.createElement('div');
+                telegramStatus.className = 'platform-status telegram';
+                telegramStatus.innerHTML = '<div class="platform-dot"></div><span>Telegram</span>';
+                indicators.appendChild(telegramStatus);
+            }
+            if (profile.email) {
+                const emailStatus = document.createElement('div');
+                emailStatus.className = 'platform-status email';
+                emailStatus.innerHTML = '<div class="platform-dot"></div><span>Email</span>';
+                indicators.appendChild(emailStatus);
+            }
+        }
+
+        function updateTimeline(records) {
+            const timeline = document.getElementById('timelineList');
+            timeline.innerHTML = '';
+            records.forEach(rec => {
+                const item = document.createElement('div');
+                // Determine source platform for styling
+                const platform = (rec.source || 'manual').toLowerCase();
+                item.className = `timeline-item ${platform} animate-fade-in`;
+                item.onclick = () => loadConversation(rec);
+                
+                // Build content
+                const content = document.createElement('div');
+                content.className = 'timeline-content-item';
+                
+                const header = document.createElement('div');
+                header.className = 'timeline-item-header';
+                const platformDiv = document.createElement('div');
+                platformDiv.className = `timeline-platform ${platform}`;
+                platformDiv.innerHTML = `<i class="${platformIcon(platform)}"></i><span>${platformLabel(platform)}</span>`;
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'timeline-date';
+                dateDiv.innerText = new Date(rec.timestamp).toLocaleString();
+                header.appendChild(platformDiv);
+                header.appendChild(dateDiv);
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'timeline-message';
+                messageDiv.innerText = rec.transcription || '(no transcription)';
+                
+                content.appendChild(header);
+                content.appendChild(messageDiv);
+                item.appendChild(content);
+                timeline.appendChild(item);
+            });
+        }
+
+        function updateMessages(records) {
+            const messagesContainer = document.getElementById('unifiedMessages');
+            messagesContainer.innerHTML = '';
+            // Reverse chronological order to oldest first for chat flow
+            const sorted = [...records].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            sorted.forEach(rec => {
+                // Athlete message
+                if (rec.transcription) {
+                    const msgEl = buildMessageElement({
+                        sender: 'Athlete',
+                        platform: rec.source || 'manual',
+                        time: rec.timestamp,
+                        content: rec.transcription,
+                        role: 'athlete'
+                    });
+                    messagesContainer.appendChild(msgEl);
+                }
+                // Coach/assistant message
+                if (rec.final_response) {
+                    const msgEl2 = buildMessageElement({
+                        sender: 'Coach',
+                        platform: rec.source || 'manual',
+                        time: rec.timestamp,
+                        content: rec.final_response,
+                        role: 'coach'
+                    });
+                    messagesContainer.appendChild(msgEl2);
+                }
+            });
+            // Scroll to bottom
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function buildMessageElement({ sender, platform, time, content, role }) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `message ${platform.toLowerCase()} animate-fade-in`;
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.innerText = sender[0];
+            const contentWrapper = document.createElement('div');
+            contentWrapper.className = 'message-content';
+            const header = document.createElement('div');
+            header.className = 'message-header';
+            const senderSpan = document.createElement('span');
+            senderSpan.className = 'message-sender';
+            senderSpan.innerText = sender;
+            const platformDiv = document.createElement('div');
+            platformDiv.className = `message-platform ${platform.toLowerCase()}`;
+            platformDiv.innerHTML = `<i class="${platformIcon(platform)}"></i><span>${platformLabel(platform)}</span>`;
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'message-time';
+            timeSpan.innerText = new Date(time).toLocaleTimeString();
+            header.appendChild(senderSpan);
+            header.appendChild(platformDiv);
+            header.appendChild(timeSpan);
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.innerText = content;
+            contentWrapper.appendChild(header);
+            contentWrapper.appendChild(bubble);
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(contentWrapper);
+            return wrapper;
+        }
+
+        function platformIcon(platform) {
+            switch (platform.toLowerCase()) {
+                case 'whatsapp': return 'fab fa-whatsapp';
+                case 'telegram': return 'fab fa-telegram-plane';
+                case 'email': return 'fas fa-envelope';
+                case 'sms': return 'fas fa-sms';
+                case 'phone': return 'fas fa-phone';
+                default: return 'fas fa-comments';
+            }
+        }
+        function platformLabel(platform) {
+            switch (platform.toLowerCase()) {
+                case 'whatsapp': return 'WhatsApp';
+                case 'telegram': return 'Telegram';
+                case 'email': return 'Email';
+                case 'sms': return 'SMS';
+                case 'phone': return 'Phone';
+                case 'manual': return 'Manual';
+                default: return platform.charAt(0).toUpperCase() + platform.slice(1);
+            }
+        }
+
+
+
+        // Called when clicking a timeline item; loads a single conversation into the chat
+        function loadConversation(record) {
+            updateMessages([record]);
+        }
+
+        function selectResponsePlatform(platform) {
             currentPlatform = platform;
-            document.querySelectorAll('.platform-option').forEach(btn => btn.classList.remove('active'));
-            document.querySelector(`.platform-option.${platform}`).classList.add('active');
+            // Toggle active state on buttons
+            ['whatsapp','telegram','email'].forEach(pl => {
+                const btn = document.getElementById(pl + 'Option');
+                if (btn) {
+                    if (pl === platform) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
+            });
+            // Toggle email subject field when email is selected
+            document.getElementById('emailFields').style.display = (platform === 'email') ? 'block' : 'none';
         }
 
-        async function sendMessage() {
-            if (!currentAthlete) {
-                showToast('Please select an athlete first', 'error');
-                return;
-            }
+        function toggleAI() {
+            aiAssistActive = !aiAssistActive;
+            const btn = document.getElementById('aiToggle');
+            if (aiAssistActive) btn.classList.add('active');
+            else btn.classList.remove('active');
+        }
 
-            const message = document.getElementById('responseInput').value.trim();
-            if (!message) {
-                showToast('Please enter a message', 'error');
-                return;
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendResponse();
             }
-
+        }
+        function handleInputChange() {
+            // Optionally implement character count or other input behaviours
+        }
+        function loadTemplate() { alert('Template feature not yet implemented.'); }
+        function addEmoji() { alert('Emoji picker not yet implemented.'); }
+        function translateText() { alert('Translate feature not yet implemented.'); }
+        function extractHighlights() { alert('Highlight extraction triggered.'); }
+        
+        async function toggleVoiceRecording() {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                await stopRecording();
+            }
+        }
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    await transcribeAudio(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                recordingStartTime = Date.now();
+                
+                // Update UI
+                document.getElementById('voiceRecording').style.display = 'flex';
+                document.getElementById('voiceBtn').classList.add('active');
+                document.getElementById('recordBtn').classList.add('active');
+                
+                // Start timer
+                startRecordingTimer();
+                
+            } catch (error) {
+                console.error('Error starting recording:', error);
+                alert('Error accessing microphone. Please ensure microphone permissions are granted.');
+            }
+        }
+        
+        function pauseRecording() {
+            if (mediaRecorder && isRecording) {
+                if (mediaRecorder.state === 'recording') {
+                    mediaRecorder.pause();
+                    clearInterval(recordingTimer);
+                } else if (mediaRecorder.state === 'paused') {
+                    mediaRecorder.resume();
+                    startRecordingTimer();
+                }
+            }
+        }
+        
+        async function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                recordingStartTime = null;
+                clearInterval(recordingTimer);
+                
+                // Update UI
+                document.getElementById('voiceRecording').style.display = 'none';
+                document.getElementById('voiceBtn').classList.remove('active');
+                document.getElementById('recordBtn').classList.remove('active');
+                document.getElementById('recordingTime').textContent = '00:00';
+            }
+        }
+        
+        function startRecordingTimer() {
+            recordingTimer = setInterval(() => {
+                if (recordingStartTime) {
+                    const elapsed = Date.now() - recordingStartTime;
+                    const minutes = Math.floor(elapsed / 60000);
+                    const seconds = Math.floor((elapsed % 60000) / 1000);
+                    document.getElementById('recordingTime').textContent = 
+                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+        
+        async function transcribeAudio(audioBlob) {
             try {
                 const formData = new FormData();
-                formData.append('athlete_id', currentAthlete.id);
-                formData.append('message', message);
-                formData.append('platform', currentPlatform);
-
-                const response = await fetch('/communication-hub/send-message', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
+                formData.append('file', audioBlob, 'recording.wav');
                 
-                if (result.status === 'sent') {
-                    showToast('Message sent successfully', 'success');
-                    document.getElementById('responseInput').value = '';
-                    await loadAthleteData(currentAthlete.id);
-                } else {
-                    showToast('Error sending message', 'error');
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                showToast('Error sending message', 'error');
-            }
-        }
-
-        async function extractHighlights() {
-            if (!currentAthlete || !conversations.length) {
-                showToast('No conversations to extract highlights from', 'error');
-                return;
-            }
-
-            try {
-                const latestConv = conversations[0];
-                const formData = new FormData();
-                formData.append('conversation_id', latestConv.id);
-                formData.append('transcription', latestConv.transcription);
-                formData.append('response', latestConv.final_response);
-
-                const response = await fetch(`/athletes/${currentAthlete.id}/highlights/generate`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    showToast(`Generated ${result.count} highlights`, 'success');
-                    await loadAthleteData(currentAthlete.id);
-                } else {
-                    showToast('Error generating highlights', 'error');
-                }
-            } catch (error) {
-                console.error('Error extracting highlights:', error);
-                showToast('Error extracting highlights', 'error');
-            }
-        }
-
-        async function transcribeAudio(audioFile) {
-            if (!currentAthlete) {
-                showToast('Please select an athlete first', 'error');
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', audioFile);
-
-            try {
                 const response = await fetch('/transcribe', {
                     method: 'POST',
                     body: formData
                 });
-
+                
                 const result = await response.json();
                 
                 if (result.transcription) {
-                    document.getElementById('responseInput').value = result.transcription;
-                    showToast('Audio transcribed successfully', 'success');
+                    // Insert transcription into the response textarea
+                    const textarea = document.getElementById('responseInput');
+                    const currentText = textarea.value;
+                    const newText = currentText + (currentText ? '\n' : '') + result.transcription;
+                    textarea.value = newText;
+                    
+                    // Focus on the textarea
+                    textarea.focus();
+                    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+                    
+                    // Show success notification
+                    showNotification('Voice message transcribed successfully!', 'success');
                 } else {
-                    showToast('Error transcribing audio', 'error');
+                    showNotification('Failed to transcribe audio. Please try again.', 'error');
                 }
+                
             } catch (error) {
                 console.error('Error transcribing audio:', error);
-                showToast('Error transcribing audio', 'error');
+                showNotification('Error transcribing audio. Please try again.', 'error');
             }
         }
-
-        function attachFile() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'audio/*';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) transcribeAudio(file);
-            };
-            input.click();
-        }
-
-        function resetViews() {
-            currentAthlete = null;
-            conversations = [];
-            highlights = [];
-            document.getElementById('athleteDetails').style.display = 'none';
-            document.getElementById('conversationsList').innerHTML = '<p style="color: var(--text-secondary); text-align: center;">Select an athlete to view conversations</p>';
-            document.getElementById('unifiedMessages').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view messages</p>';
-            document.getElementById('highlightsContent').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Select an athlete to view highlights</p>';
-            document.getElementById('chatStatus').textContent = 'Select an athlete to start';
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                position: fixed;
-                top: 1rem;
-                right: 1rem;
-                padding: 1rem 1.5rem;
-                background: var(--bg-secondary);
-                border: 1px solid var(--border-primary);
-                border-radius: 0.5rem;
-                color: var(--text-primary);
-                z-index: 1000;
-                box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-                max-width: 300px;
+        
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <div class="notification-icon">
+                        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                    </div>
+                    <div class="notification-body">
+                        <div class="notification-title">${message}</div>
+                    </div>
+                </div>
             `;
             
-            if (type === 'error') {
-                toast.style.borderColor = 'var(--error-500)';
-                toast.style.color = 'var(--error-500)';
-            } else if (type === 'success') {
-                toast.style.borderColor = 'var(--success-500)';
-                toast.style.color = 'var(--success-500)';
-            }
+            // Add to page
+            document.body.appendChild(notification);
             
-            toast.textContent = message;
-            document.body.appendChild(toast);
+            // Show notification
+            setTimeout(() => notification.classList.add('show'), 100);
             
+            // Remove after 3 seconds
             setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
             }, 3000);
         }
+        
+        function attachFile() { alert('File attachment not yet implemented.'); }
 
-        // Auto-refresh every 30 seconds
-        setInterval(() => {
-            if (currentAthlete) {
-                loadAthleteData(currentAthlete.id);
+        async function sendResponse() {
+            const text = document.getElementById('responseInput').value.trim();
+            if (!text || !currentAthleteId) {
+                alert('Please enter a response.');
+                return;
             }
-        }, 30000);
+            try {
+                // Save the response directly without AI generation; it will be stored as both generated and final response.
+                const formData = new FormData();
+                formData.append('athlete_id', currentAthleteId);
+                formData.append('transcription', '');
+                formData.append('generated_response', text);
+                formData.append('final_response', text);
+                formData.append('category', 'general');
+                formData.append('priority', 'medium');
+                formData.append('notes', '');
+                formData.append('source', currentPlatform);
+                const res = await fetch('/save', { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'saved') {
+                    // Clear input
+                    document.getElementById('responseInput').value = '';
+                    // Reload athlete history to show new message
+                    await loadAthlete(currentAthleteId);
+                } else {
+                    alert('Failed to save message.');
+                }
+            } catch (err) {
+                console.error('Error sending response:', err);
+                alert('Error sending response');
+            }
+        }
+
+        // Highlight tab switching (UI only)
+        function switchHighlightTab(tab) {
+            document.getElementById('tabAuto').classList.remove('active');
+            document.getElementById('tabManual').classList.remove('active');
+            document.getElementById('tabAI').classList.remove('active');
+            if (tab === 'auto') document.getElementById('tabAuto').classList.add('active');
+            if (tab === 'manual') document.getElementById('tabManual').classList.add('active');
+            if (tab === 'ai') document.getElementById('tabAI').classList.add('active');
+        }
+
+        // Highlights Functions
+        let allHighlights = [];
+        
+        function updateAllHighlights() {
+            const container = document.getElementById('highlightsContent');
+            container.innerHTML = '';
+            
+            if (allHighlights.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No highlights yet. Click "Add Manual Highlight" to create one.</p>';
+                return;
+            }
+            
+            allHighlights.forEach(h => {
+                const item = document.createElement('div');
+                item.className = `highlight-item ${h.category || 'general'} animate-fade-in`;
+                
+                const bullet = document.createElement('div');
+                bullet.className = 'highlight-bullet';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'highlight-content';
+                
+                const textDiv = document.createElement('div');
+                textDiv.className = 'highlight-text';
+                textDiv.innerText = h.highlight_text;
+                
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'highlight-meta';
+                
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'highlight-category';
+                categoryDiv.innerText = h.category || 'general';
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'highlight-time';
+                timeDiv.innerText = h.created_at ? new Date(h.created_at).toLocaleDateString() : '';
+                
+                metaDiv.appendChild(categoryDiv);
+                metaDiv.appendChild(timeDiv);
+                contentDiv.appendChild(textDiv);
+                contentDiv.appendChild(metaDiv);
+                item.appendChild(bullet);
+                item.appendChild(contentDiv);
+                container.appendChild(item);
+            });
+        }
+        
+        function openHighlightModal(highlightId = null) {
+            const modal = document.getElementById('highlightModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('highlightForm');
+            const textarea = document.getElementById('highlightText');
+            const category = document.getElementById('highlightCategory');
+            
+            if (highlightId) {
+                // Edit mode
+                const highlight = allHighlights.find(h => h.id === highlightId);
+                if (highlight) {
+                    title.textContent = 'Edit Highlight';
+                    textarea.value = highlight.highlight_text;
+                    category.value = highlight.category || 'general';
+                    form.dataset.highlightId = highlightId;
+                }
+            } else {
+                // Create mode
+                title.textContent = 'Create Manual Highlight';
+                textarea.value = '';
+                category.value = 'general';
+                delete form.dataset.highlightId;
+            }
+            
+            modal.classList.add('show');
+        }
+        
+        function closeHighlightModal() {
+            const modal = document.getElementById('highlightModal');
+            modal.classList.remove('show');
+        }
+        
+        async function saveHighlight(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const textarea = document.getElementById('highlightText');
+            const category = document.getElementById('highlightCategory');
+            const highlightId = form.dataset.highlightId;
+            
+            const highlightData = {
+                highlight_text: textarea.value.trim(),
+                category: category.value
+            };
+            
+            if (!highlightData.highlight_text) {
+                showNotification('Please enter highlight text', 'error');
+                return;
+            }
+            
+            try {
+                let response;
+                if (highlightId) {
+                    // Update existing highlight
+                    const formData = new FormData();
+                    formData.append('highlight_text', highlightData.highlight_text);
+                    formData.append('category', highlightData.category);
+                    
+                    response = await fetch(`/highlights/${highlightId}/content`, {
+                        method: 'PUT',
+                        body: formData
+                    });
+                } else {
+                    // Create new highlight
+                    const formData = new FormData();
+                    formData.append('highlight_text', highlightData.highlight_text);
+                    formData.append('category', highlightData.category);
+                    
+                    response = await fetch(`/athletes/${currentAthleteId}/highlights`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'success' || result.id) {
+                    showNotification(highlightId ? 'Highlight updated successfully!' : 'Highlight created successfully!', 'success');
+                    closeHighlightModal();
+                    
+                    // Reload all highlights
+                    await loadAllHighlights();
+                } else {
+                    showNotification('Failed to save highlight', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error saving highlight:', error);
+                showNotification('Error saving highlight', 'error');
+            }
+        }
+        
+        async function loadAllHighlights() {
+            try {
+                const response = await fetch(`/athletes/${currentAthleteId}/highlights`);
+                const data = await response.json();
+                allHighlights = data.highlights || [];
+                updateAllHighlights();
+            } catch (error) {
+                console.error('Error loading highlights:', error);
+                allHighlights = [];
+                updateAllHighlights();
+            }
+        }
+        
+        async function deleteHighlight(highlightId) {
+            if (!confirm('Are you sure you want to delete this highlight?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/highlights/${highlightId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showNotification('Highlight deleted successfully!', 'success');
+                    await loadAllHighlights();
+                } else {
+                    showNotification('Failed to delete highlight', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Error deleting highlight:', error);
+                showNotification('Error deleting highlight', 'error');
+            }
+        }
+        
+        function editHighlight(highlightId) {
+            openHighlightModal(highlightId);
+        }
+        
+        // Placeholder filter function; currently no filtering logic implemented
+        function filterTimeline(filter) {
+            console.log('Timeline filter clicked:', filter);
+        }
+
+        // Highlight tab switching (UI only)
+        function switchHighlightTab(tab) {
+            document.querySelectorAll('.highlight-tab').forEach(tabBtn => {
+                tabBtn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            console.log('Switched to', tab, 'highlights');
+        }
+        
+        // Initialize once the page has loaded
+        window.addEventListener('load', () => {
+            initializeHub();
+            
+            // Add form event listener for highlight modal
+            document.getElementById('highlightForm').addEventListener('submit', saveHighlight);
+        });
     </script>
 </body>
 </html>

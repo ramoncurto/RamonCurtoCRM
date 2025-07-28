@@ -786,6 +786,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a href="/communication-hub" class="nav-link">
+                        <i class="fas fa-comments"></i>
+                        Communication Hub
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a href="/athletes/manage" class="nav-link active">
                         <i class="fas fa-users"></i>
                         Athletes
@@ -932,6 +938,45 @@
         </div>
     </div>
 
+    <!-- Edit Athlete Modal -->
+    <div class="modal" id="editAthleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Edit Athlete</h2>
+                <button class="close-btn" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="editAthleteForm" onsubmit="handleEditAthlete(event)">
+                <input type="hidden" id="editAthleteId">
+                <div class="form-group">
+                    <label class="form-label" for="editAthleteName">Name *</label>
+                    <input type="text" id="editAthleteName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="editAthleteEmail">Email</label>
+                    <input type="email" id="editAthleteEmail" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="editAthletePhone">Phone</label>
+                    <input type="tel" id="editAthletePhone" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="editAthleteSport">Sport</label>
+                    <input type="text" id="editAthleteSport" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="editAthleteLevel">Level</label>
+                    <input type="text" id="editAthleteLevel" class="form-control" placeholder="e.g., Professional, Amateur, Elite">
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                        <i class="fas fa-save"></i>
+                        Update Athlete
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div class="toast" id="toast">
         <div class="toast-content">
@@ -1063,6 +1108,11 @@
             document.getElementById('addAthleteForm').reset();
         }
 
+        function closeEditModal() {
+            document.getElementById('editAthleteModal').classList.remove('show');
+            document.getElementById('editAthleteForm').reset();
+        }
+
         async function handleAddAthlete(event) {
             event.preventDefault();
             
@@ -1096,9 +1146,60 @@
             window.location.href = `/athletes/${athleteId}/history/view`;
         }
 
-        function editAthlete(athleteId) {
-            // TODO: Implement edit functionality
-            showToast('Edit functionality coming soon', 'info');
+        async function editAthlete(athleteId) {
+            try {
+                const response = await fetch(`/athletes/${athleteId}`);
+                const athlete = await response.json();
+                
+                if (athlete.status === 'error') {
+                    showToast('Athlete not found', 'error');
+                    return;
+                }
+                
+                // Populate the edit form
+                document.getElementById('editAthleteId').value = athlete.id;
+                document.getElementById('editAthleteName').value = athlete.name;
+                document.getElementById('editAthleteEmail').value = athlete.email || '';
+                document.getElementById('editAthletePhone').value = athlete.phone || '';
+                document.getElementById('editAthleteSport').value = athlete.sport || '';
+                document.getElementById('editAthleteLevel').value = athlete.level || '';
+                
+                // Show the edit modal
+                document.getElementById('editAthleteModal').classList.add('show');
+                
+            } catch (error) {
+                showToast('Error loading athlete data', 'error');
+            }
+        }
+
+        async function handleEditAthlete(event) {
+            event.preventDefault();
+            
+            const athleteId = document.getElementById('editAthleteId').value;
+            const formData = new FormData();
+            formData.append('name', document.getElementById('editAthleteName').value);
+            formData.append('email', document.getElementById('editAthleteEmail').value);
+            formData.append('phone', document.getElementById('editAthletePhone').value);
+            formData.append('sport', document.getElementById('editAthleteSport').value);
+            formData.append('level', document.getElementById('editAthleteLevel').value);
+
+            try {
+                const response = await fetch(`/athletes/${athleteId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.status === 'updated') {
+                    showToast('Athlete updated successfully', 'success');
+                    closeEditModal();
+                    loadAthletes();
+                } else {
+                    showToast(data.message || 'Error updating athlete', 'error');
+                }
+            } catch (error) {
+                showToast('Error updating athlete', 'error');
+            }
         }
 
         function showToast(message, type = 'success') {

@@ -721,7 +721,65 @@ async def get_athlete(athlete_id: int) -> JSONResponse:
             "level": athlete[5],
             "created_at": athlete[6]
         })
-    return JSONResponse({"status": "error", "message": "Athlete not found"})
+    return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
+
+
+@app.put("/athletes/{athlete_id}", response_class=JSONResponse)
+async def update_athlete(
+    athlete_id: int,
+    name: str = Form(...),
+    email: str = Form(""),
+    phone: str = Form(""),
+    sport: str = Form(""),
+    level: str = Form("")
+) -> JSONResponse:
+    """Update an existing athlete."""
+    try:
+        with conn:
+            cursor = conn.execute(
+                """
+                UPDATE athletes 
+                SET name = ?, email = ?, phone = ?, sport = ?, level = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (name, email, phone, sport, level, athlete_id)
+            )
+            
+            if cursor.rowcount > 0:
+                return JSONResponse({"status": "updated", "message": "Athlete updated successfully"})
+            else:
+                return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
+                
+    except sqlite3.IntegrityError:
+        return JSONResponse({"status": "error", "message": "Email already exists"}, status_code=400)
+    except Exception as e:
+        logger.error(f"Error updating athlete: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.delete("/athletes/{athlete_id}", response_class=JSONResponse)
+async def delete_athlete(athlete_id: int) -> JSONResponse:
+    """Delete an athlete and all associated records."""
+    try:
+        with conn:
+            # First check if athlete exists
+            cursor = conn.execute("SELECT id FROM athletes WHERE id = ?", (athlete_id,))
+            if not cursor.fetchone():
+                return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
+            
+            # Delete associated records
+            conn.execute("DELETE FROM records WHERE athlete_id = ?", (athlete_id,))
+            conn.execute("DELETE FROM athlete_highlights WHERE athlete_id = ?", (athlete_id,))
+            conn.execute("DELETE FROM athlete_metrics WHERE athlete_id = ?", (athlete_id,))
+            
+            # Delete the athlete
+            conn.execute("DELETE FROM athletes WHERE id = ?", (athlete_id,))
+            
+            return JSONResponse({"status": "deleted", "message": "Athlete and all associated data deleted successfully"})
+                
+    except Exception as e:
+        logger.error(f"Error deleting athlete: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -1386,7 +1444,8 @@ async def create_highlight(
 @app.get("/athletes/{athlete_id}/highlights", response_class=JSONResponse)
 async def get_highlights(
     athlete_id: int,
-    active_only: bool = True
+    active_only: bool = True,
+    manual_only: bool = False
 ) -> JSONResponse:
     """
     Get all highlights for an athlete.
@@ -1397,6 +1456,8 @@ async def get_highlights(
         ID of the athlete
     active_only : bool
         Whether to return only active highlights
+    manual_only : bool
+        Whether to return only manual highlights (not AI-generated)
         
     Returns
     -------
@@ -1404,6 +1465,11 @@ async def get_highlights(
         List of highlights for the athlete
     """
     highlights = get_athlete_highlights(athlete_id, active_only)
+    
+    if manual_only:
+        # Filter to only manual highlights (those without source_conversation_id)
+        highlights = [h for h in highlights if not h.get('source_conversation_id')]
+    
     return JSONResponse({"highlights": highlights})
 
 
@@ -1429,6 +1495,47 @@ async def update_highlight(
     """
     result = update_highlight_status(highlight_id, is_active)
     return JSONResponse(result)
+
+
+@app.put("/highlights/{highlight_id}/content", response_class=JSONResponse)
+async def update_highlight_content(
+    highlight_id: int,
+    highlight_text: str = Form(...),
+    category: str = Form(...)
+) -> JSONResponse:
+    """
+    Update the content of a highlight.
+    
+    Parameters
+    ----------
+    highlight_id : int
+        ID of the highlight to update
+    highlight_text : str
+        The new highlight text
+    category : str
+        The new category
+        
+    Returns
+    -------
+    JSONResponse
+        Result with status
+    """
+    try:
+        with conn:
+            cursor = conn.execute("""
+                UPDATE athlete_highlights 
+                SET highlight_text = ?, category = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (highlight_text, category, highlight_id))
+            
+            if cursor.rowcount > 0:
+                return JSONResponse({"status": "success", "message": "Highlight updated successfully"})
+            else:
+                return JSONResponse({"status": "error", "message": "Highlight not found"}, status_code=404)
+                
+    except Exception as e:
+        logger.error(f"Error updating highlight content: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 
 @app.delete("/highlights/{highlight_id}", response_class=JSONResponse)

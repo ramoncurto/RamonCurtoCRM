@@ -1,0 +1,2622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Elite CRM • Omnichannel Communication Hub</title>
+    <!-- Font Awesome icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <!--
+        This HTML file implements a 360° customer service dashboard for the Elite CRM system.
+        It consolidates messaging across WhatsApp, Telegram, Email, and Phone into a single
+        unified view. The layout is composed of three primary sections:
+        1. Customer sidebar – displays the customer's profile, connection status and a timeline
+           of past interactions across channels.
+        2. Unified chat – a realtime conversation view that merges incoming and outgoing
+           messages from all supported platforms. Audio messages can be played back or
+           transcribed on demand.
+        3. Highlights sidebar – automatically extracted insights and AI‑powered suggestions
+           based on recent conversation history.
+
+        The CSS variables defined in :root provide a consistent colour palette for both
+        light/dark modes and brand accents. Responsiveness is handled via CSS media
+        queries at 1400px, 1200px, 1024px and 768px breakpoints.
+
+        When integrating this file into your FastAPI/Flask project, place it in your
+        ``templates`` directory and serve it via a new route (e.g. ``/communication-hub``):
+
+            @app.get("/communication-hub", response_class=HTMLResponse)
+            async def communication_hub(request: Request) -> HTMLResponse:
+                return templates.TemplateResponse("communication_hub.html", {"request": request})
+
+        The accompanying JavaScript at the bottom of the file contains helper functions
+        for message sending, audio playback/transcription and highlight extraction. These
+        functions currently simulate server behaviour. To make them functional you should
+        replace the placeholder calls with requests to your existing API endpoints
+        (e.g. ``/transcribe``, ``/generate``, ``/save``) and persist conversation state in
+        your database.
+    -->
+    <style>
+        :root {
+            /* Brand Colours */
+            --primary-500: #6366f1;
+            --primary-600: #4f46e5;
+            --primary-700: #4338ca;
+            --secondary-500: #8b5cf6;
+            --secondary-600: #7c3aed;
+            
+            /* Platform Colours */
+            --whatsapp: #25d366;
+            --telegram: #0088cc;
+            --sms: #007aff;
+            --email: #ea4335;
+            --phone: #34a853;
+            
+            /* Semantic Colours */
+            --success-50: #ecfdf5;
+            --success-500: #10b981;
+            --success-600: #059669;
+            --warning-50: #fffbeb;
+            --warning-500: #f59e0b;
+            --warning-600: #d97706;
+            --error-50: #fef2f2;
+            --error-500: #ef4444;
+            --error-600: #dc2626;
+            --info-50: #eff6ff;
+            --info-500: #3b82f6;
+            --info-600: #2563eb;
+            
+            /* Status Colours */
+            --online: #10b981;
+            --away: #f59e0b;
+            --busy: #ef4444;
+            --offline: #6b7280;
+            
+            /* Dark Theme */
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-tertiary: #1f2937;
+            --bg-surface: #374151;
+            --bg-overlay: rgba(17, 24, 39, 0.8);
+            --bg-chat: #0f172a;
+            
+            /* Text Colours */
+            --text-primary: #f9fafb;
+            --text-secondary: #d1d5db;
+            --text-tertiary: #9ca3af;
+            --text-quaternary: #6b7280;
+            
+            /* Borders */
+            --border-primary: #374151;
+            --border-secondary: #4b5563;
+            --border-focus: var(--primary-500);
+            
+            /* Shadows */
+            --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+            
+            /* Spacing */
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-5: 1.25rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-10: 2.5rem;
+            --space-12: 3rem;
+            --space-16: 4rem;
+            
+            /* Border Radius */
+            --radius-sm: 0.25rem;
+            --radius-md: 0.375rem;
+            --radius-lg: 0.5rem;
+            --radius-xl: 0.75rem;
+            --radius-2xl: 1rem;
+            --radius-3xl: 1.5rem;
+            
+            /* Transitions */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            font-feature-settings: 'cv11', 'ss01';
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Main Layout */
+        .communication-hub {
+            display: grid;
+            grid-template-columns: 320px 1fr 380px;
+            grid-template-rows: 100vh;
+            height: 100vh;
+        }
+
+        /* Left Sidebar - Customer & Timeline */
+        .customer-sidebar {
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Customer Header */
+        .customer-header {
+            padding: var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .customer-profile {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            margin-bottom: var(--space-4);
+        }
+
+        .customer-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+            position: relative;
+        }
+
+        .status-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-tertiary);
+            background: var(--online);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .customer-info h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: var(--space-1);
+        }
+
+        .customer-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .tier-badge {
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid #fbbf24;
+        }
+
+        .platform-indicators {
+            display: flex;
+            gap: var(--space-2);
+            margin-top: var(--space-4);
+        }
+
+        .platform-status {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .platform-status.whatsapp {
+            color: var(--whatsapp);
+            background: rgba(37, 211, 102, 0.1);
+        }
+
+        .platform-status.telegram {
+            color: var(--telegram);
+            background: rgba(0, 136, 204, 0.1);
+        }
+
+        .platform-status.email {
+            color: var(--email);
+            background: rgba(234, 67, 53, 0.1);
+        }
+
+        .platform-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        /* Conversation Timeline */
+        .timeline-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .timeline-header {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .timeline-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-3);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .timeline-filters {
+            display: flex;
+            gap: var(--space-2);
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: var(--space-1) var(--space-3);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 9999px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .filter-btn:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .filter-btn.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .timeline-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-4);
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: var(--space-6);
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border-primary);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: var(--space-4);
+            margin-bottom: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .timeline-item:hover {
+            transform: translateX(2px);
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 8px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            border: 2px solid var(--bg-tertiary);
+            z-index: 1;
+        }
+
+        .timeline-item.whatsapp::before { background: var(--whatsapp); }
+        .timeline-item.telegram::before { background: var(--telegram); }
+        .timeline-item.email::before { background: var(--email); }
+        .timeline-item.phone::before { background: var(--phone); }
+
+        .timeline-content-item {
+            background: var(--bg-tertiary);
+            padding: var(--space-4);
+            border-radius: var(--radius-xl);
+            margin-left: var(--space-4);
+            transition: all var(--transition-fast);
+        }
+
+        .timeline-content-item:hover {
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-md);
+        }
+
+        .timeline-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .timeline-platform {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: var(--space-1) var(--space-2);
+            border-radius: 9999px;
+        }
+
+        .timeline-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+        .timeline-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+        .timeline-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+        .timeline-platform.phone { background: rgba(52, 168, 83, 0.2); color: var(--phone); }
+
+        .timeline-date {
+            font-size: 0.75rem;
+            color: var(--text-quaternary);
+        }
+
+        .timeline-message {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: var(--space-2);
+        }
+
+        /* Unified Chat Area */
+        .unified-chat {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-chat);
+        }
+
+        /* Chat Header */
+        .chat-header {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+        }
+
+        .omnichannel-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+        }
+
+        .chat-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chat-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-500);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--success-500);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        /* Unified Messages */
+        .unified-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-6);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-4);
+        }
+
+        .message {
+            display: flex;
+            gap: var(--space-3);
+            max-width: 75%;
+        }
+
+        .message.sent {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .message.sent .message-avatar {
+            background: var(--bg-surface);
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+
+        .message-sender {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .message-platform {
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+        }
+
+        .message-platform.whatsapp { background: rgba(37, 211, 102, 0.2); color: var(--whatsapp); }
+        .message-platform.telegram { background: rgba(0, 136, 204, 0.2); color: var(--telegram); }
+        .message-platform.email { background: rgba(234, 67, 53, 0.2); color: var(--email); }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-quaternary);
+        }
+
+        .message-bubble {
+            padding: var(--space-4);
+            border-radius: var(--radius-xl);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            position: relative;
+        }
+
+        /* Audio Message Styles */
+        .audio-message {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            margin-bottom: var(--space-2);
+        }
+
+        .audio-controls {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .audio-play-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 1rem;
+        }
+
+        .audio-play-btn:hover {
+            background: var(--primary-600);
+            transform: scale(1.05);
+        }
+
+        .audio-play-btn.playing {
+            background: var(--error-500);
+        }
+
+        .audio-info {
+            flex: 1;
+        }
+
+        .audio-duration {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: var(--space-1);
+        }
+
+        .audio-waveform {
+            height: 20px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-progress {
+            height: 100%;
+            background: var(--primary-500);
+            border-radius: var(--radius-lg);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .audio-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .audio-action-btn {
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .audio-action-btn:hover {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .audio-action-btn.active {
+            background: var(--success-500);
+            color: white;
+            border-color: var(--success-500);
+        }
+
+        .audio-action-btn.transcribing {
+            background: var(--warning-500);
+            color: white;
+            border-color: var(--warning-500);
+            animation: pulse 1s infinite;
+        }
+
+        /* Transcript Styles */
+        .transcript-container {
+            margin-top: var(--space-3);
+            padding: var(--space-3);
+            background: var(--bg-primary);
+            border: 1px solid var(--border-secondary);
+            border-radius: var(--radius-lg);
+        }
+
+        .transcript-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--space-2);
+        }
+
+        .transcript-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .transcript-status {
+            font-size: 0.75rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .transcript-status.processing {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning-500);
+        }
+
+        .transcript-status.completed {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success-500);
+        }
+
+        .transcript-status.saved {
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--primary-500);
+        }
+
+        .transcript-text {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+            margin-bottom: var(--space-3);
+            padding: var(--space-3);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--primary-500);
+        }
+
+        .transcript-actions {
+            display: flex;
+            gap: var(--space-2);
+            justify-content: flex-end;
+        }
+
+        .transcript-btn {
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: var(--space-1);
+        }
+
+        .transcript-btn:hover {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .transcript-btn.save-btn {
+            background: var(--success-500);
+            color: white;
+            border-color: var(--success-500);
+        }
+
+        .transcript-btn.save-btn:hover {
+            background: var(--success-600);
+        }
+
+        .message.sent .message-bubble {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .message.whatsapp .message-avatar {
+            background: var(--whatsapp);
+        }
+
+        .message.telegram .message-avatar {
+            background: var(--telegram);
+        }
+
+        .message.email .message-avatar {
+            background: var(--email);
+        }
+
+        /* Response Area */
+        .response-area {
+            border-top: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+        }
+
+        /* Platform Selector */
+        .platform-selector {
+            padding: var(--space-4) var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .selector-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-3);
+        }
+
+        .platform-options {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .platform-option {
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .platform-option:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+        }
+
+        .platform-option.active {
+            color: white;
+            border-color: currentColor;
+        }
+
+        .platform-option.whatsapp.active {
+            background: var(--whatsapp);
+        }
+
+        .platform-option.telegram.active {
+            background: var(--telegram);
+        }
+
+        .platform-option.email.active {
+            background: var(--email);
+        }
+
+        /* Response Input */
+        .response-input {
+            padding: var(--space-6);
+        }
+
+        .input-tools {
+            display: flex;
+            gap: var(--space-2);
+            margin-bottom: var(--space-4);
+            flex-wrap: wrap;
+        }
+
+        .tool-btn {
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            font-size: 0.875rem;
+        }
+
+        .tool-btn:hover {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            border-color: var(--primary-500);
+        }
+
+        .tool-btn.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .voice-recording {
+            display: none;
+            align-items: center;
+            gap: var(--space-3);
+            padding: var(--space-4);
+            background: var(--error-50);
+            border: 1px solid var(--error-500);
+            border-radius: var(--radius-xl);
+            margin-bottom: var (--space-4);
+        }
+
+        .voice-recording.active {
+            display: flex;
+        }
+
+        .recording-indicator {
+            width: 12px;
+            height: 12px;
+            background: var(--error-500);
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+        }
+
+        .recording-time {
+            font-weight: 600;
+            color: var(--error-600);
+        }
+
+        .recording-controls {
+            display: flex;
+            gap: var(--space-2);
+            margin-left: auto;
+        }
+
+        .recording-btn {
+            padding: var(--space-2);
+            border: none;
+            border-radius: var(--radius-lg);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .recording-btn:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .recording-btn.stop {
+            background: var(--error-500);
+            color: white;
+        }
+
+        .input-container {
+            position: relative;
+        }
+
+        .response-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: var(--space-4) var(--space-16) var(--space-4) var(--space-4);
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-primary);
+            border-radius: var(--radius-xl);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            resize: vertical;
+            font-family: inherit;
+            line-height: 1.5;
+            transition: all var(--transition-fast);
+        }
+
+        .response-textarea:focus {
+            outline: none;
+            border-color: var(--primary-500);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .response-textarea::placeholder {
+            color: var(--text-quaternary);
+        }
+
+        .email-fields {
+            display: none;
+            gap: var(--space-4);
+            margin-bottom: var (--space-4);
+        }
+
+        .email-fields.active {
+            display: flex;
+        }
+
+        .email-subject {
+            flex: 1;
+            padding: var(--space-3) var(--space-4);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .email-fields input:focus {
+            outline: none;
+            border-color: var(--primary-500);
+        }
+
+        .input-actions {
+            position: absolute;
+            right: var(--space-3);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .input-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-lg);
+            border: none;
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .input-btn:hover {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .input-btn.send-btn {
+            background: var(--primary-500);
+            color: white;
+        }
+
+        .input-btn.send-btn:hover {
+            background: var(--primary-600);
+            transform: scale(1.05);
+        }
+
+        .input-btn.recording {
+            background: var(--error-500);
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        /* Right Sidebar - Highlights & AI */
+        .highlights-sidebar {
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .highlights-header {
+            padding: var(--space-6);
+            border-bottom: 1px solid var(--border-primary);
+            background: var(--bg-tertiary);
+        }
+
+        .highlights-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-2);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .highlights-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .highlights-tabs {
+            display: flex;
+            gap: var(--space-1);
+            margin-top: var(--space-4);
+        }
+
+        .highlight-tab {
+            padding: var(--space-2) var(--space-3);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .highlight-tab:hover {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .highlight-tab.active {
+            background: var(--primary-500);
+            color: white;
+            border-color: var(--primary-500);
+        }
+
+        .highlights-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--space-6);
+        }
+
+        /* Compact Keynote‑style Highlights */
+        .highlight-item {
+            padding: var(--space-2) var(--space-3);
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-2);
+            transition: all var(--transition-fast);
+            cursor: pointer;
+            position: relative;
+            border-left: 2px solid var(--primary-500);
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            min-height: 40px;
+        }
+
+        .highlight-item:hover {
+            background: var(--bg-surface);
+            transform: translateX(1px);
+        }
+
+        .highlight-bullet {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            flex-shrink: 0;
+        }
+
+        .highlight-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .highlight-text {
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            line-height: 1.2;
+            font-weight: 500;
+            margin: 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .highlight-meta {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .highlight-category {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--primary-500);
+        }
+
+        .highlight-time {
+            font-size: 0.65rem;
+            color: var(--text-quaternary);
+            font-weight: 500;
+        }
+
+        /* Category‑specific colours */
+        .highlight-item.nutrition {
+            border-left-color: var(--warning-500);
+        }
+
+        .highlight-item.nutrition .highlight-bullet {
+            background: var(--warning-500);
+        }
+
+        .highlight-item.nutrition .highlight-category {
+            background: rgba(245, 158, 11, 0.15);
+            color: var (--warning-500);
+        }
+
+        .highlight-item.achievement {
+            border-left-color: var(--success-500);
+        }
+
+        .highlight-item.achievement .highlight-bullet {
+            background: var (--success-500);
+        }
+
+        .highlight-item.achievement .highlight-category {
+            background: rgba(16, 185, 129, 0.15);
+            color: var (--success-500);
+        }
+
+        .highlight-item.question {
+            border-left-color: var(--info-500);
+        }
+
+        .highlight-item.question .highlight-bullet {
+            background: var (--info-500);
+        }
+
+        .highlight-item.question .highlight-category {
+            background: rgba(59, 130, 246, 0.15);
+            color: var (--info-500);
+        }
+
+        .highlight-item.concern {
+            border-left-color: var(--error-500);
+        }
+
+        .highlight-item.concern .highlight-bullet {
+            background: var (--error-500);
+        }
+
+        .highlight-item.concern .highlight-category {
+            background: rgba(239, 68, 68, 0.15);
+            color: var (--error-500);
+        }
+
+        /* AI Suggestions for Highlights */
+        .ai-highlight-suggestion {
+            padding: var(--space-4);
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: var(--radius-xl);
+            margin-bottom: var(--space-4);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .ai-highlight-suggestion:hover {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .ai-suggestion-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-3);
+            margin-bottom: var (--space-3);
+        }
+
+        .ai-suggestion-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+        }
+
+        .ai-suggestion-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .ai-suggestion-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: var(--space-3);
+        }
+
+        .ai-suggestion-actions {
+            display: flex;
+            gap: var(--space-2);
+        }
+
+        .ai-suggestion-btn {
+            padding: var(--space-2) var(--space-3);
+            background: var(--primary-500);
+            border: none;
+            border-radius: var(--radius-lg);
+            color: white;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .ai-suggestion-btn:hover {
+            background: var(--primary-600);
+        }
+
+        .ai-suggestion-btn.secondary {
+            background: var (--bg-surface);
+            color: var (--text-secondary);
+        }
+
+        .ai-suggestion-btn.secondary:hover {
+            background: var (--bg-tertiary);
+            color: var (--text-primary);
+        }
+
+        /* Auto‑highlight notification */
+        .auto-highlight-notification {
+            position: fixed;
+            top: var(--space-6);
+            right: calc(380px + var(--space-6));
+            max-width: 300px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--primary-500);
+            border-radius: var (--radius-xl);
+            padding: var(--space-4);
+            box-shadow: var (--shadow-2xl);
+            z-index: 1000;
+            transform: translateY(-120%);
+            transition: all var (--transition-base);
+        }
+
+        .auto-highlight-notification.show {
+            transform: translateY(0);
+        }
+
+        .notification-content {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-3);
+        }
+
+        .notification-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--primary-500);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .notification-body {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: var(--space-1);
+            font-size: 0.875rem;
+        }
+
+        .notification-description {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            line-height: 1.3;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1400px) {
+            .communication-hub {
+                grid-template-columns: 300px 1fr 350px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .communication-hub {
+                grid-template-columns: 280px 1fr 320px;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .communication-hub {
+                grid-template-columns: 1fr 300px;
+            }
+            
+            .customer-sidebar {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .communication-hub {
+                grid-template-columns: 1fr;
+            }
+            
+            .highlights-sidebar {
+                display: none;
+            }
+        }
+
+        /* Animations */
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .animate-slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .animate-highlight {
+            animation: highlightFlash 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes highlightFlash {
+            0% { background: rgba(99, 102, 241, 0.3); }
+            100% { background: var(--bg-tertiary); }
+        }
+    </style>
+</head>
+<body>
+    <div class="communication-hub">
+        <!-- Left Sidebar - Customer Profile & Timeline -->
+        <div class="customer-sidebar">
+            <!-- Customer Header -->
+            <div class="customer-header">
+                <div class="customer-profile">
+                    <div class="customer-avatar">
+                        SJ
+                        <div class="status-indicator"></div>
+                    </div>
+                    <div class="customer-info">
+                        <h2>Sarah Johnson</h2>
+                        <div class="customer-details">
+                            <span class="tier-badge">VIP</span>
+                            <span>Marathon Runner</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="platform-indicators">
+                    <div class="platform-status whatsapp">
+                        <div class="platform-dot"></div>
+                        <span>WhatsApp</span>
+                    </div>
+                    <div class="platform-status telegram">
+                        <div class="platform-dot"></div>
+                        <span>Telegram</span>
+                    </div>
+                    <div class="platform-status email">
+                        <div class="platform-dot"></div>
+                        <span>Email</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline Section -->
+            <div class="timeline-section">
+                <div class="timeline-header">
+                    <div class="timeline-title">
+                        <i class="fas fa-history"></i>
+                        All Conversations
+                    </div>
+                    
+                    <div class="timeline-filters">
+                        <button class="filter-btn active" onclick="filterTimeline('all')">All</button>
+                        <button class="filter-btn" onclick="filterTimeline('today')">Today</button>
+                        <button class="filter-btn" onclick="filterTimeline('week')">Week</button>
+                        <button class="filter-btn" onclick="filterTimeline('whatsapp')">WhatsApp</button>
+                        <button class="filter-btn" onclick="filterTimeline('telegram')">Telegram</button>
+                        <button class="filter-btn" onclick="filterTimeline('email')">Email</button>
+                    </div>
+                </div>
+
+                <div class="timeline-content">
+                    <div class="timeline">
+                        <div class="timeline-item whatsapp" onclick="loadConversation('whatsapp-1')">
+                            <div class="timeline-content-item">
+                                <div class="timeline-item-header">
+                                    <div class="timeline-platform whatsapp">
+                                        <i class="fab fa-whatsapp"></i>
+                                        <span>WhatsApp</span>
+                                    </div>
+                                    <div class="timeline-date">2 hours ago</div>
+                                </div>
+                                <div class="timeline-message">
+                                    Asked about carb loading strategy for upcoming race. Expressed concern about digestive issues.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="timeline-item email" onclick="loadConversation('email-1')">
+                            <div class="timeline-content-item">
+                                <div class="timeline-item-header">
+                                    <div class="timeline-platform email">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>Email</span>
+                                    </div>
+                                    <div class="timeline-date">1 day ago</div>
+                                </div>
+                                <div class="timeline-message">
+                                    Forwarded training plan from coach with specific questions about recovery protocols.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="timeline-item telegram" onclick="loadConversation('telegram-1')">
+                            <div class="timeline-content-item">
+                                <div class="timeline-item-header">
+                                    <div class="timeline-platform telegram">
+                                        <i class="fab fa-telegram-plane"></i>
+                                        <span>Telegram</span>
+                                    </div>
+                                    <div class="timeline-date">3 days ago</div>
+                                </div>
+                                <div class="timeline-message">
+                                    Shared race photos and celebration message after successful half-marathon PR.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="timeline-item whatsapp" onclick="loadConversation('whatsapp-2')">
+                            <div class="timeline-content-item">
+                                <div class="timeline-item-header">
+                                    <div class="timeline-platform whatsapp">
+                                        <i class="fab fa-whatsapp"></i>
+                                        <span>WhatsApp Audio</span>
+                                    </div>
+                                    <div class="timeline-date">5 days ago</div>
+                                </div>
+                                <div class="timeline-message">
+                                    🎤 Voice message (2:34) about pre-race breakfast timing and energy management strategies.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="timeline-item telegram" onclick="loadConversation('telegram-2')">
+                            <div class="timeline-content-item">
+                                <div class="timeline-item-header">
+                                    <div class="timeline-platform telegram">
+                                        <i class="fab fa-telegram-plane"></i>
+                                        <span>Telegram Audio</span>
+                                    </div>
+                                    <div class="timeline-date">1 week ago</div>
+                                </div>
+                                <div class="timeline-message">
+                                    🎤 Voice message (1:47) discussing recovery concerns after intense training session.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Unified Chat Area -->
+        <div class="unified-chat">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-info">
+                    <div class="omnichannel-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div>
+                        <div class="chat-title">Omnichannel Conversation</div>
+                        <div class="chat-subtitle">All platforms in one view</div>
+                    </div>
+                </div>
+                
+                <div class="live-indicator">
+                    <div class="live-dot"></div>
+                    <span>Live</span>
+                </div>
+            </div>
+
+            <!-- Unified Messages -->
+            <div class="unified-messages" id="unifiedMessages">
+                <!-- Example messages to demonstrate layout. Replace these with server‑side rendered content or AJAX updates. -->
+                <div class="message whatsapp animate-fade-in">
+                    <div class="message-avatar">SJ</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">Sarah Johnson</span>
+                            <div class="message-platform whatsapp">
+                                <i class="fab fa-whatsapp"></i>
+                                <span>WhatsApp</span>
+                            </div>
+                            <span class="message-time">2:30 PM</span>
+                        </div>
+                        <div class="message-bubble">
+                            Hi! I'm getting nervous about my carb loading for Boston Marathon. Last time I tried it, I had some digestive issues during the race. Can you help me with a better strategy?
+                        </div>
+                    </div>
+                </div>
+
+                <div class="message email animate-fade-in">
+                    <div class="message-avatar">SJ</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">Sarah Johnson</span>
+                            <div class="message-platform email">
+                                <i class="fas fa-envelope"></i>
+                                <span>Email</span>
+                            </div>
+                            <span class="message-time">Yesterday 4:15 PM</span>
+                        </div>
+                        <div class="message-bubble">
+                            Hi there! I forwarded you the training plan my previous coach sent me. I have some specific questions about the recovery protocols mentioned on page 3. Also, could you review the weekly mileage progression? It seems quite aggressive for my current fitness level. Looking forward to your expert opinion!
+                        </div>
+                    </div>
+                </div>
+
+                <div class="message telegram animate-fade-in">
+                    <div class="message-avatar">SJ</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">Sarah Johnson</span>
+                            <div class="message-platform telegram">
+                                <i class="fab fa-telegram-plane"></i>
+                                <span>Telegram</span>
+                            </div>
+                            <span class="message-time">3 days ago</span>
+                        </div>
+                        <div class="message-bubble">
+                            🎉 Just finished my half marathon PR! 1:25:30 - 2 minutes faster than my previous best! Feeling so confident about Boston now! Thank you for all the support! 🏃‍♀️💪
+                        </div>
+                    </div>
+                </div>
+
+                <div class="message whatsapp animate-fade-in">
+                    <div class="message-avatar">SJ</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">Sarah Johnson</span>
+                            <div class="message-platform whatsapp">
+                                <i class="fab fa-whatsapp"></i>
+                                <span>WhatsApp Audio</span>
+                            </div>
+                            <span class="message-time">5 days ago</span>
+                        </div>
+                        <div class="audio-message">
+                            <div class="audio-controls">
+                                <button class="audio-play-btn" onclick="toggleAudioPlayback(this)" data-audio-id="audio1">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                            <div class="audio-info">
+                                <div class="audio-duration">2:34</div>
+                                <div class="audio-waveform">
+                                    <div class="audio-progress" id="progress-audio1"></div>
+                                </div>
+                            </div>
+                            <div class="audio-actions">
+                                <button class="audio-action-btn" onclick="transcribeAudio('audio1', this)">
+                                    <i class="fas fa-file-text"></i>
+                                    Transcribe
+                                </button>
+                            </div>
+                        </div>
+                        <div class="transcript-container" id="transcript-audio1" style="display: none;">
+                            <div class="transcript-header">
+                                <div class="transcript-label">
+                                    <i class="fas fa-microphone"></i>
+                                    Audio Transcript
+                                </div>
+                                <div class="transcript-status completed">Completed</div>
+                            </div>
+                            <div class="transcript-text" id="transcript-text-audio1">
+                                "Hey! I just wanted to quickly ask about breakfast timing before my long run tomorrow. Should I eat 2 hours before or is 90 minutes enough? I'm planning to do 18 miles and I'm worried about having enough energy but also not feeling too full. Also, what do you think about having a banana 30 minutes before starting? Thanks so much for all your help!"
+                            </div>
+                            <div class="transcript-actions">
+                                <button class="transcript-btn" onclick="editTranscript('audio1')">
+                                    <i class="fas fa-edit"></i>
+                                    Edit
+                                </button>
+                                <button class="transcript-btn" onclick="copyTranscript('audio1')">
+                                    <i class="fas fa-copy"></i>
+                                    Copy
+                                </button>
+                                <button class="transcript-btn save-btn" onclick="saveToAthleteRecord('audio1')">
+                                    <i class="fas fa-save"></i>
+                                    Save to Record
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="message telegram animate-fade-in">
+                    <div class="message-avatar">SJ</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-sender">Sarah Johnson</span>
+                            <div class="message-platform telegram">
+                                <i class="fab fa-telegram-plane"></i>
+                                <span>Telegram Audio</span>
+                            </div>
+                            <span class="message-time">1 week ago</span>
+                        </div>
+                        <div class="audio-message">
+                            <div class="audio-controls">
+                                <button class="audio-play-btn" onclick="toggleAudioPlayback(this)" data-audio-id="audio2">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                            <div class="audio-info">
+                                <div class="audio-duration">1:47</div>
+                                <div class="audio-waveform">
+                                    <div class="audio-progress" id="progress-audio2"></div>
+                                </div>
+                            </div>
+                            <div class="audio-actions">
+                                <button class="audio-action-btn" onclick="transcribeAudio('audio2', this)">
+                                    <i class="fas fa-file-text"></i>
+                                    Transcribe
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Response Area -->
+            <div class="response-area">
+                <!-- Platform Selector -->
+                <div class="platform-selector">
+                    <div class="selector-title">Choose Response Platform</div>
+                    <div class="platform-options">
+                        <button class="platform-option whatsapp active" onclick="selectResponsePlatform('whatsapp')">
+                            <i class="fab fa-whatsapp"></i>
+                            <span>WhatsApp</span>
+                        </button>
+                        <button class="platform-option telegram" onclick="selectResponsePlatform('telegram')">
+                            <i class="fab fa-telegram-plane"></i>
+                            <span>Telegram</span>
+                        </button>
+                        <button class="platform-option email" onclick="selectResponsePlatform('email')">
+                            <i class="fas fa-envelope"></i>
+                            <span>Email</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Response Input -->
+                <div class="response-input">
+                    <div class="input-tools">
+                        <button class="tool-btn active" onclick="toggleAI()">
+                            <i class="fas fa-robot"></i>
+                            AI Assist
+                        </button>
+                        <button class="tool-btn" id="voiceBtn" onclick="toggleVoiceRecording()">
+                            <i class="fas fa-microphone"></i>
+                            Voice (WhatsApp)
+                        </button>
+                        <button class="tool-btn" onclick="loadTemplate()">
+                            <i class="fas fa-file-alt"></i>
+                            Templates
+                        </button>
+                        <button class="tool-btn" onclick="addEmoji()">
+                            <i class="fas fa-smile"></i>
+                            Emoji
+                        </button>
+                        <button class="tool-btn" onclick="translateText()">
+                            <i class="fas fa-language"></i>
+                            Translate
+                        </button>
+                        <button class="tool-btn" onclick="extractHighlights()">
+                            <i class="fas fa-highlighter"></i>
+                            Extract Highlights
+                        </button>
+                    </div>
+
+                    <!-- Voice Recording UI -->
+                    <div class="voice-recording" id="voiceRecording">
+                        <div class="recording-indicator"></div>
+                        <span>Recording voice message for WhatsApp...</span>
+                        <div class="recording-time" id="recordingTime">00:00</div>
+                        <div class="recording-controls">
+                            <button class="recording-btn" onclick="pauseRecording()">
+                                <i class="fas fa-pause"></i>
+                            </button>
+                            <button class="recording-btn stop" onclick="stopRecording()">
+                                <i class="fas fa-stop"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Email Fields -->
+                    <div class="email-fields" id="emailFields">
+                        <input type="text" class="email-subject" placeholder="Email Subject" id="emailSubject">
+                    </div>
+                    
+                    <div class="input-container">
+                        <textarea 
+                            class="response-textarea" 
+                            id="responseInput"
+                            placeholder="Type your WhatsApp response... (AI suggestions active)"
+                            rows="4"
+                            onkeydown="handleKeyPress(event)"
+                            oninput="handleInputChange()"
+                        ></textarea>
+                        
+                        <div class="input-actions">
+                            <button class="input-btn" title="Attach File" onclick="attachFile()">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                            <button class="input-btn" id="recordBtn" title="Voice Message" onclick="toggleVoiceRecording()">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button class="input-btn send-btn" title="Send Message" onclick="sendResponse()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Highlights & AI -->
+        <div class="highlights-sidebar">
+            <div class="highlights-header">
+                <div class="highlights-title">
+                    <i class="fas fa-highlighter"></i>
+                    Conversation Highlights
+                </div>
+                <p class="highlights-subtitle">Auto-extracted insights & key points</p>
+                
+                <div class="highlights-tabs">
+                    <button class="highlight-tab active" onclick="switchHighlightTab('auto')">Auto</button>
+                    <button class="highlight-tab" onclick="switchHighlightTab('manual')">Manual</button>
+                    <button class="highlight-tab" onclick="switchHighlightTab('ai')">AI Suggest</button>
+                </div>
+            </div>
+
+            <div class="highlights-content" id="highlightsContent">
+                <!-- Example auto highlights. In production these should be generated from your database or AI model. -->
+                <div class="highlight-item nutrition">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Carb loading concerns due to previous digestive issues</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Nutrition</div>
+                        <div class="highlight-time">2h</div>
+                    </div>
+                </div>
+
+                <div class="highlight-item achievement">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Half-marathon PR: 1:25:30 (2min improvement)</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Achievement</div>
+                        <div class="highlight-time">3d</div>
+                    </div>
+                </div>
+
+                <div class="highlight-item question">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Training plan review - recovery protocols & mileage</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Question</div>
+                        <div class="highlight-time">1d</div>
+                    </div>
+                </div>
+
+                <div class="highlight-item concern">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Aggressive weekly mileage progression concerns</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Concern</div>
+                        <div class="highlight-time">1d</div>
+                    </div>
+                </div>
+
+                <div class="highlight-item question">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Hydration strategy for race day aid stations</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Question</div>
+                        <div class="highlight-time">5m</div>
+                    </div>
+                </div>
+
+                <div class="highlight-item concern">
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Left calf tightness after 20-mile long run</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Concern</div>
+                        <div class="highlight-time">10m</div>
+                    </div>
+                </div>
+
+                <!-- AI Suggestions -->
+                <div class="ai-highlight-suggestion">
+                    <div class="ai-suggestion-header">
+                        <div class="ai-suggestion-icon">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="ai-suggestion-title">Suggested Response Strategy</div>
+                    </div>
+                    <div class="ai-suggestion-text">
+                        Based on conversation history, recommend addressing nutrition concerns first via WhatsApp (preferred channel), then follow up with detailed training plan via email.
+                    </div>
+                    <div class="ai-suggestion-actions">
+                        <button class="ai-suggestion-btn" onclick="applyStrategy(1)">Apply Strategy</button>
+                        <button class="ai-suggestion-btn secondary" onclick="customizeStrategy(1)">Customize</button>
+                    </div>
+                </div>
+
+                <div class="ai-highlight-suggestion">
+                    <div class="ai-suggestion-header">
+                        <div class="ai-suggestion-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="ai-suggestion-title">Follow-up Reminder</div>
+                    </div>
+                    <div class="ai-suggestion-text">
+                        Schedule check-in 1 week before Boston Marathon to review final preparations and address any last-minute concerns.
+                    </div>
+                    <div class="ai-suggestion-actions">
+                        <button class="ai-suggestion-btn" onclick="scheduleReminder()">Schedule</button>
+                        <button class="ai-suggestion-btn secondary" onclick="modifyReminder()">Modify</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-highlight notification -->
+    <div class="auto-highlight-notification" id="highlightNotification">
+        <div class="notification-content">
+            <div class="notification-icon">
+                <i class="fas fa-highlighter"></i>
+            </div>
+            <div class="notification-body">
+                <div class="notification-title">New Highlight Extracted</div>
+                <div class="notification-description">AI found a key point about nutrition concerns in the conversation</div>
+            </div>
+        </div>
+    </div>
+
+    <!--
+        The JavaScript below mirrors the original behaviour of the communication hub
+        prototype. For a production system you should integrate these functions
+        with your backend routes (FastAPI/Flask) to persist messages and
+        perform actual transcription/AI calls.
+    -->
+    <script>
+        let currentResponsePlatform = 'whatsapp';
+        let isRecording = false;
+        let recordingTime = 0;
+        let recordingInterval;
+        let aiAssistActive = true;
+        let activeHighlightTab = 'auto';
+        let audioPlayers = {};
+        let athleteRecord = {
+            transcripts: [],
+            highlights: [],
+            audioMessages: []
+        };
+
+        function initializeHub() {
+            console.log('Omnichannel Communication Hub initialized');
+            updateResponsePlatform();
+            setTimeout(() => simulateIncomingMessage(), 5000);
+        }
+
+        function selectResponsePlatform(platform) {
+            currentResponsePlatform = platform;
+            document.querySelectorAll('.platform-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            document.querySelector(`.platform-option.${platform}`).classList.add('active');
+            updateResponsePlatform();
+            showToast(`Switched to ${platform.charAt(0).toUpperCase() + platform.slice(1)} response`, 'success');
+        }
+
+        function updateResponsePlatform() {
+            const platformConfig = {
+                whatsapp: {
+                    placeholder: 'Type your WhatsApp response...',
+                    voiceEnabled: true,
+                    emailFields: false
+                },
+                telegram: {
+                    placeholder: 'Type your Telegram response...',
+                    voiceEnabled: false,
+                    emailFields: false
+                },
+                email: {
+                    placeholder: 'Type your email response...',
+                    voiceEnabled: false,
+                    emailFields: true
+                }
+            };
+            const config = platformConfig[currentResponsePlatform];
+            document.getElementById('responseInput').placeholder = config.placeholder + ' (AI suggestions active)';
+            const voiceBtn = document.getElementById('voiceBtn');
+            if (config.voiceEnabled) {
+                voiceBtn.style.display = 'flex';
+                voiceBtn.innerHTML = '<i class="fas fa-microphone"></i> Voice (WhatsApp)';
+            } else {
+                voiceBtn.style.display = 'none';
+            }
+            const emailFields = document.getElementById('emailFields');
+            if (config.emailFields) {
+                emailFields.classList.add('active');
+            } else {
+                emailFields.classList.remove('active');
+            }
+            const recordBtn = document.getElementById('recordBtn');
+            recordBtn.style.display = config.voiceEnabled ? 'flex' : 'none';
+        }
+
+        function toggleVoiceRecording() {
+            if (currentResponsePlatform !== 'whatsapp') {
+                showToast('Voice messages only available for WhatsApp', 'warning');
+                return;
+            }
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            isRecording = true;
+            recordingTime = 0;
+            document.getElementById('voiceRecording').classList.add('active');
+            document.getElementById('recordBtn').classList.add('recording');
+            recordingInterval = setInterval(() => {
+                recordingTime++;
+                const minutes = Math.floor(recordingTime / 60).toString().padStart(2, '0');
+                const seconds = (recordingTime % 60).toString().padStart(2, '0');
+                document.getElementById('recordingTime').textContent = `${minutes}:${seconds}`;
+            }, 1000);
+            showToast('Voice recording started', 'success');
+        }
+
+        function pauseRecording() {
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+            showToast('Recording paused', 'info');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            if (recordingInterval) {
+                clearInterval(recordingInterval);
+                recordingInterval = null;
+            }
+            document.getElementById('voiceRecording').classList.remove('active');
+            document.getElementById('recordBtn').classList.remove('recording');
+            const duration = recordingTime;
+            const message = `🎤 Voice message (${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')})`;
+            addMessageToChat(message, 'sent', 'You', new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 'YU', currentResponsePlatform);
+            showToast(`Voice message sent via WhatsApp (${duration}s)`, 'success');
+            recordingTime = 0;
+        }
+
+        function sendResponse() {
+            const input = document.getElementById('responseInput');
+            const message = input.value.trim();
+            const subject = document.getElementById('emailSubject')?.value || '';
+            if (!message) return;
+            let finalMessage = message;
+            if (currentResponsePlatform === 'email' && subject) {
+                finalMessage = `Subject: ${subject}\n\n${message}`;
+            }
+            addMessageToChat(finalMessage, 'sent', 'You', new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 'YU', currentResponsePlatform);
+            input.value = '';
+            if (document.getElementById('emailSubject')) {
+                document.getElementById('emailSubject').value = '';
+            }
+            setTimeout(() => {
+                extractHighlights();
+            }, 1000);
+            showToast(`Message sent via ${currentResponsePlatform.charAt(0).toUpperCase() + currentResponsePlatform.slice(1)}`, 'success');
+        }
+
+        function addMessageToChat(text, type, sender, time, avatar, platform) {
+            const messagesContainer = document.getElementById('unifiedMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type} ${platform} animate-slide-up`;
+            const platformIcons = {
+                whatsapp: 'fab fa-whatsapp',
+                telegram: 'fab fa-telegram-plane',
+                email: 'fas fa-envelope'
+            };
+            const platformNames = {
+                whatsapp: 'WhatsApp',
+                telegram: 'Telegram',
+                email: 'Email'
+            };
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-sender">${sender}</span>
+                        <div class="message-platform ${platform}">
+                            <i class="${platformIcons[platform]}"></i>
+                            <span>${platformNames[platform]}</span>
+                        </div>
+                        <span class="message-time">${time}</span>
+                    </div>
+                    <div class="message-bubble">${text}</div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function simulateIncomingMessage() {
+            const platforms = ['whatsapp', 'telegram', 'email'];
+            const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+            const isAudioMessage = (randomPlatform === 'whatsapp' || randomPlatform === 'telegram') && Math.random() < 0.3;
+            if (isAudioMessage) {
+                simulateIncomingAudioMessage(randomPlatform);
+                return;
+            }
+            const messages = {
+                whatsapp: [
+                    'Quick question about hydration during the race - how much should I drink at each aid station?',
+                    'Just finished my 20-mile long run! Felt great but noticed some tightness in my left calf.',
+                    'Weather forecast shows rain for race day. Any tips for running in wet conditions?'
+                ],
+                telegram: [
+                    '📸 Here\'s my latest running stats from this week\'s training! What do you think?',
+                    'Found this great article about marathon pacing strategies. Thoughts? 🤔',
+                    'My running group wants to know about your coaching services. Can I share your contact?'
+                ],
+                email: [
+                    'Thank you for the detailed training plan. I have a few questions about the tempo run paces you\'ve outlined. Could we schedule a call to discuss?',
+                    'I wanted to follow up on our conversation about race day nutrition. I\'ve attached my current meal plan for your review.',
+                    'My physical therapist recommended some modifications to my training schedule. How should we adjust the plan accordingly?'
+                ]
+            };
+            const platformMessages = messages[randomPlatform];
+            const randomMessage = platformMessages[Math.floor(Math.random() * platformMessages.length)];
+            addMessageToChat(randomMessage, 'received', 'Sarah Johnson', new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 'SJ', randomPlatform);
+            setTimeout(() => {
+                extractHighlights();
+            }, 2000);
+            showToast(`New message received via ${randomPlatform.charAt(0).toUpperCase() + randomPlatform.slice(1)}`, 'info');
+        }
+
+        function simulateIncomingAudioMessage(platform) {
+            const audioId = 'audio_' + Date.now();
+            const duration = Math.floor(Math.random() * 180) + 30;
+            const durationStr = `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`;
+            const messagesContainer = document.getElementById('unifiedMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message received ${platform} animate-slide-up`;
+            const platformIcons = {
+                whatsapp: 'fab fa-whatsapp',
+                telegram: 'fab fa-telegram-plane'
+            };
+            const platformNames = {
+                whatsapp: 'WhatsApp Audio',
+                telegram: 'Telegram Audio'
+            };
+            messageDiv.innerHTML = `
+                <div class="message-avatar">SJ</div>
+                <div class="message-content">
+                    <div class="message-header">
+                        <span class="message-sender">Sarah Johnson</span>
+                        <div class="message-platform ${platform}">
+                            <i class="${platformIcons[platform]}"></i>
+                            <span>${platformNames[platform]}</span>
+                        </div>
+                        <span class="message-time">${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div class="audio-message">
+                        <div class="audio-controls">
+                            <button class="audio-play-btn" onclick="toggleAudioPlayback(this)" data-audio-id="${audioId}">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                        <div class="audio-info">
+                            <div class="audio-duration">${durationStr}</div>
+                            <div class="audio-waveform">
+                                <div class="audio-progress" id="progress-${audioId}"></div>
+                            </div>
+                        </div>
+                        <div class="audio-actions">
+                            <button class="audio-action-btn" onclick="transcribeAudio('${audioId}', this)">
+                                <i class="fas fa-file-text"></i>
+                                Transcribe
+                            </button>
+                        </div>
+                    </div>
+                    <div class="transcript-container" id="transcript-${audioId}" style="display: none;"></div>
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            showToast(`New audio message received via ${platform.charAt(0).toUpperCase() + platform.slice(1)}`, 'info');
+        }
+
+        function toggleAudioPlayback(button) {
+            const audioId = button.dataset.audioId;
+            const icon = button.querySelector('i');
+            const progressBar = document.getElementById(`progress-${audioId}`);
+            if (audioPlayers[audioId] && audioPlayers[audioId].playing) {
+                clearInterval(audioPlayers[audioId].interval);
+                audioPlayers[audioId].playing = false;
+                icon.className = 'fas fa-play';
+                button.classList.remove('playing');
+                showToast('Audio playback stopped', 'info');
+            } else {
+                audioPlayers[audioId] = {
+                    playing: true,
+                    progress: 0,
+                    interval: setInterval(() => {
+                        audioPlayers[audioId].progress += 2;
+                        progressBar.style.width = `${audioPlayers[audioId].progress}%`;
+                        if (audioPlayers[audioId].progress >= 100) {
+                            clearInterval(audioPlayers[audioId].interval);
+                            audioPlayers[audioId].playing = false;
+                            icon.className = 'fas fa-play';
+                            button.classList.remove('playing');
+                            audioPlayers[audioId].progress = 0;
+                            progressBar.style.width = '0%';
+                            showToast('Audio playback completed', 'success');
+                        }
+                    }, 100)
+                };
+                icon.className = 'fas fa-pause';
+                button.classList.add('playing');
+                showToast('Audio playback started', 'info');
+            }
+        }
+
+        function transcribeAudio(audioId, button) {
+            const transcriptContainer = document.getElementById(`transcript-${audioId}`);
+            button.classList.add('transcribing');
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Transcribing...';
+            setTimeout(() => {
+                const sampleTranscripts = [
+                    'Hi! I just finished my morning run and I wanted to ask about something. I\'ve been experiencing some knee discomfort during my longer runs, especially after mile 10. It\'s not severe pain, but it\'s definitely noticeable. Should I be concerned about this? I\'m wondering if it\'s my running form or maybe I need new shoes. I\'ve been using the same pair for about 500 miles now. What would you recommend?',
+                    'Hey there! Quick update on my training - I completed the 16-mile long run you prescribed and it went really well! I maintained my target pace throughout and felt strong at the finish. However, I wanted to ask about nutrition during the run. I tried those energy gels you mentioned but they seemed to upset my stomach a bit. Do you have any alternative suggestions for fueling during long runs?',
+                    'Good morning! I hope you\'re doing well. I\'ve been following the training plan religiously and I\'m really happy with my progress. My question today is about recovery - I\'ve been feeling quite fatigued after my speed work sessions. Is this normal? I\'m making sure to get enough sleep and I\'m eating well, but I\'m wondering if I should be doing anything else to help with recovery. Maybe some specific stretches or supplements?',
+                    'Hi! I wanted to share some exciting news - I just ran my fastest 5K time yesterday! It was during a local race and I managed to break my personal record by almost a minute. I felt amazing throughout the entire race. I think all the interval training we\'ve been doing is really paying off. What should be my next goal? Should we start working towards a 10K or focus on improving my 5K time even more?'
+                ];
+                const randomTranscript = sampleTranscripts[Math.floor(Math.random() * sampleTranscripts.length)];
+                transcriptContainer.innerHTML = `
+                    <div class="transcript-header">
+                        <div class="transcript-label">
+                            <i class="fas fa-microphone"></i>
+                            Audio Transcript
+                        </div>
+                        <div class="transcript-status completed">Completed</div>
+                    </div>
+                    <div class="transcript-text" id="transcript-text-${audioId}">${randomTranscript}</div>
+                    <div class="transcript-actions">
+                        <button class="transcript-btn" onclick="editTranscript('${audioId}')">
+                            <i class="fas fa-edit"></i>
+                            Edit
+                        </button>
+                        <button class="transcript-btn" onclick="copyTranscript('${audioId}')">
+                            <i class="fas fa-copy"></i>
+                            Copy
+                        </button>
+                        <button class="transcript-btn save-btn" onclick="saveToAthleteRecord('${audioId}')">
+                            <i class="fas fa-save"></i>
+                            Save to Record
+                        </button>
+                    </div>
+                `;
+                transcriptContainer.style.display = 'block';
+                button.classList.remove('transcribing');
+                button.classList.add('active');
+                button.innerHTML = '<i class="fas fa-check"></i> Transcribed';
+                athleteRecord.transcripts.push({
+                    id: audioId,
+                    text: randomTranscript,
+                    timestamp: new Date().toISOString(),
+                    platform: audioId.includes('whatsapp') ? 'WhatsApp' : 'Telegram',
+                    saved: false
+                });
+                showToast('Audio transcription completed!', 'success');
+                setTimeout(() => {
+                    extractHighlights();
+                }, 1000);
+            }, 3000);
+        }
+
+        function editTranscript(audioId) {
+            const transcriptText = document.getElementById(`transcript-text-${audioId}`);
+            const currentText = transcriptText.textContent;
+            transcriptText.contentEditable = true;
+            transcriptText.style.border = '2px solid var(--primary-500)';
+            transcriptText.style.outline = 'none';
+            transcriptText.focus();
+            const transcriptActions = transcriptText.parentElement.querySelector('.transcript-actions');
+            transcriptActions.innerHTML = `
+                <button class="transcript-btn" onclick="cancelEditTranscript('${audioId}', '${currentText.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button class="transcript-btn save-btn" onclick="saveEditTranscript('${audioId}')">
+                    <i class="fas fa-check"></i>
+                    Save Changes
+                </button>
+            `;
+            showToast('Transcript editing enabled', 'info');
+        }
+
+        function saveEditTranscript(audioId) {
+            const transcriptText = document.getElementById(`transcript-text-${audioId}`);
+            transcriptText.contentEditable = false;
+            transcriptText.style.border = 'none';
+            const transcriptActions = transcriptText.parentElement.querySelector('.transcript-actions');
+            transcriptActions.innerHTML = `
+                <button class="transcript-btn" onclick="editTranscript('${audioId}')">
+                    <i class="fas fa-edit"></i>
+                    Edit
+                </button>
+                <button class="transcript-btn" onclick="copyTranscript('${audioId}')">
+                    <i class="fas fa-copy"></i>
+                    Copy
+                </button>
+                <button class="transcript-btn save-btn" onclick="saveToAthleteRecord('${audioId}')">
+                    <i class="fas fa-save"></i>
+                    Save to Record
+                </button>
+            `;
+            const transcriptIndex = athleteRecord.transcripts.findIndex(t => t.id === audioId);
+            if (transcriptIndex !== -1) {
+                athleteRecord.transcripts[transcriptIndex].text = transcriptText.textContent;
+                athleteRecord.transcripts[transcriptIndex].edited = true;
+            }
+            showToast('Transcript updated successfully', 'success');
+        }
+
+        function cancelEditTranscript(audioId, originalText) {
+            const transcriptText = document.getElementById(`transcript-text-${audioId}`);
+            transcriptText.contentEditable = false;
+            transcriptText.style.border = 'none';
+            transcriptText.textContent = originalText;
+            const transcriptActions = transcriptText.parentElement.querySelector('.transcript-actions');
+            transcriptActions.innerHTML = `
+                <button class="transcript-btn" onclick="editTranscript('${audioId}')">
+                    <i class="fas fa-edit"></i>
+                    Edit
+                </button>
+                <button class="transcript-btn" onclick="copyTranscript('${audioId}')">
+                    <i class="fas fa-copy"></i>
+                    Copy
+                </button>
+                <button class="transcript-btn save-btn" onclick="saveToAthleteRecord('${audioId}')">
+                    <i class="fas fa-save"></i>
+                    Save to Record
+                </button>
+            `;
+            showToast('Transcript editing cancelled', 'info');
+        }
+
+        function copyTranscript(audioId) {
+            const transcriptText = document.getElementById(`transcript-text-${audioId}`).textContent;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(transcriptText).then(() => {
+                    showToast('Transcript copied to clipboard', 'success');
+                });
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = transcriptText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast('Transcript copied to clipboard', 'success');
+            }
+        }
+
+        function saveToAthleteRecord(audioId) {
+            const transcriptText = document.getElementById(`transcript-text-${audioId}`).textContent;
+            const transcriptStatus = document.querySelector(`#transcript-${audioId} .transcript-status`);
+            const saveButton = document.querySelector(`#transcript-${audioId} .save-btn`);
+            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            saveButton.disabled = true;
+            setTimeout(() => {
+                const transcriptIndex = athleteRecord.transcripts.findIndex(t => t.id === audioId);
+                if (transcriptIndex !== -1) {
+                    athleteRecord.transcripts[transcriptIndex].saved = true;
+                    athleteRecord.transcripts[transcriptIndex].savedDate = new Date().toISOString();
+                }
+                transcriptStatus.className = 'transcript-status saved';
+                transcriptStatus.textContent = 'Saved to Record';
+                saveButton.innerHTML = '<i class="fas fa-check"></i> Saved';
+                saveButton.disabled = false;
+                saveButton.style.background = 'var(--success-600)';
+                const highlightsContent = document.getElementById('highlightsContent');
+                const newHighlight = document.createElement('div');
+                newHighlight.className = 'highlight-item achievement animate-slide-up';
+                newHighlight.innerHTML = `
+                    <div class="highlight-bullet"></div>
+                    <div class="highlight-content">
+                        <div class="highlight-text">Audio transcript saved to athlete record</div>
+                    </div>
+                    <div class="highlight-meta">
+                        <div class="highlight-category">Record</div>
+                        <div class="highlight-time">now</div>
+                    </div>
+                `;
+                highlightsContent.insertBefore(newHighlight, highlightsContent.firstChild);
+                showToast('Transcript saved to athlete record successfully!', 'success');
+                console.log('Athlete Record Updated:', {
+                    totalTranscripts: athleteRecord.transcripts.length,
+                    savedTranscripts: athleteRecord.transcripts.filter(t => t.saved).length,
+                    latestTranscript: {
+                        id: audioId,
+                        preview: transcriptText.substring(0, 100) + '...',
+                        saved: true
+                    }
+                });
+            }, 1500);
+        }
+
+        function extractHighlights() {
+            const highlightCategories = [
+                { name: 'Nutrition', class: 'nutrition' },
+                { name: 'Training', class: 'question' },
+                { name: 'Recovery', class: 'concern' },
+                { name: 'Question', class: 'question' },
+                { name: 'Achievement', class: 'achievement' },
+                { name: 'Concern', class: 'concern' }
+            ];
+            const highlightTexts = [
+                'Hydration strategy questions for race day',
+                'Calf tightness after long training run',
+                'Rainy weather running advice needed',
+                'Tempo run pace review requested',
+                'Coaching services referral interest'
+            ];
+            const notification = document.getElementById('highlightNotification');
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 4000);
+            const randomCategory = highlightCategories[Math.floor(Math.random() * highlightCategories.length)];
+            const randomText = highlightTexts[Math.floor(Math.random() * highlightTexts.length)];
+            const highlightsContent = document.getElementById('highlightsContent');
+            const newHighlight = document.createElement('div');
+            newHighlight.className = `highlight-item ${randomCategory.class} animate-slide-up`;
+            newHighlight.innerHTML = `
+                <div class="highlight-bullet"></div>
+                <div class="highlight-content">
+                    <div class="highlight-text">${randomText}</div>
+                </div>
+                <div class="highlight-meta">
+                    <div class="highlight-category">${randomCategory.name}</div>
+                    <div class="highlight-time">now</div>
+                </div>
+            `;
+            highlightsContent.insertBefore(newHighlight, highlightsContent.firstChild);
+            console.log(`New highlight extracted: ${randomCategory.name} - ${randomText}`);
+        }
+
+        function filterTimeline(filter) {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            const timelineItems = document.querySelectorAll('.timeline-item');
+            timelineItems.forEach(item => {
+                if (filter === 'all') {
+                    item.style.display = 'block';
+                } else if (['whatsapp', 'telegram', 'email'].includes(filter)) {
+                    item.style.display = item.classList.contains(filter) ? 'block' : 'none';
+                } else {
+                    const shouldShow = Math.random() > 0.3;
+                    item.style.display = shouldShow ? 'block' : 'none';
+                }
+            });
+            showToast(`Filtered by ${filter}`, 'info');
+        }
+
+        function loadConversation(conversationId) {
+            showToast(`Loading conversation ${conversationId}...`, 'info');
+        }
+
+        function switchHighlightTab(tab) {
+            activeHighlightTab = tab;
+            document.querySelectorAll('.highlight-tab').forEach(tabBtn => {
+                tabBtn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            showToast(`Switched to ${tab} highlights`, 'info');
+        }
+
+        function applyStrategy(id) {
+            showToast(`Applied AI strategy #${id}`, 'success');
+        }
+
+        function scheduleReminder() {
+            showToast('Follow-up reminder scheduled', 'success');
+        }
+
+        function modifyReminder() {
+            showToast('Reminder customization opened', 'info');
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendResponse();
+            }
+        }
+
+        function handleInputChange() {
+            const input = document.getElementById('responseInput');
+            const hasText = input.value.trim().length > 0;
+            const sendBtn = document.querySelector('.send-btn');
+            if (hasText) {
+                sendBtn.style.background = 'var(--primary-500)';
+            } else {
+                sendBtn.style.background = 'var(--bg-surface)';
+            }
+        }
+
+        function toggleAI() {
+            aiAssistActive = !aiAssistActive;
+            const btn = event.target.closest('.tool-btn');
+            btn.classList.toggle('active');
+            showToast(`AI Assist ${aiAssistActive ? 'enabled' : 'disabled'}`, aiAssistActive ? 'success' : 'warning');
+        }
+
+        function loadTemplate() {
+            showToast('Loading message templates...', 'info');
+        }
+
+        function addEmoji() {
+            showToast('Emoji picker opened', 'info');
+        }
+
+        function translateText() {
+            showToast('Translation service activated', 'info');
+        }
+
+        function attachFile() {
+            showToast('File attachment dialog opened', 'info');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.cssText = `
+                position: fixed;
+                top: var(--space-6);
+                right: var(--space-6);
+                max-width: 300px;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
+                border-radius: var(--radius-xl);
+                padding: var(--space-4);
+                box-shadow: var(--shadow-2xl);
+                z-index: 1000;
+                transform: translateX(120%);
+                transition: all var(--transition-base);
+            `;
+            const colors = {
+                success: '--success-500',
+                warning: '--warning-500',
+                error: '--error-500',
+                info: '--info-500'
+            };
+            const icons = {
+                success: 'check',
+                warning: 'exclamation-triangle',
+                error: 'times',
+                info: 'info-circle'
+            };
+            toast.innerHTML = `
+                <div style="display: flex; align-items: center; gap: var(--space-3);">
+                    <div style="width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(${colors[type]}); color: white; font-size: 0.75rem;">
+                        <i class="fas fa-${icons[type]}"></i>
+                    </div>
+                    <div style="color: var(--text-primary); font-size: 0.875rem;">
+                        ${message}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 100);
+            setTimeout(() => {
+                toast.style.transform = 'translateX(120%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', initializeHub);
+    </script>
+</body>
+</html>
