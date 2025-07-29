@@ -1,120 +1,83 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}Elite Athletes • CRM Platform{% endblock %}</title>
-    <!-- Font Awesome icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <!-- Main CSS -->
-    <link rel="stylesheet" href="{{ url_for('static', path='css/main.css') }}">
-    <!-- Block for additional styles -->
-    {% block extra_css %}{% endblock %}
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Elite Athletes CRM{% endblock %}</title>
+  
+  <!-- Fonts and Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- Styles -->
+  <link href="/static/css/main.css" rel="stylesheet" />
+  <link href="/static/css/outreach.css" rel="stylesheet" />
+  {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <div class="app-container">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-trophy"></i>
-                    </div>
-                    <span>Elite CRM</span>
-                </div>
-            </div>
-
-            <nav class="nav-section">
-                <h3 class="nav-section-title">Main</h3>
-                <ul class="nav-menu">
-                    <li class="nav-item">
-                        <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">
-                            <i class="fas fa-chart-line"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/athletes" class="nav-link {% if request.path == '/athletes' %}active{% endif %}">
-                            <i class="fas fa-users"></i>
-                            <span>Athletes</span>
-                            <span class="nav-badge" id="athleteCount">0</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/history" class="nav-link {% if request.path == '/history' %}active{% endif %}">
-                            <i class="fas fa-history"></i>
-                            <span>History</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/communication-hub" class="nav-link {% if request.path == '/communication-hub' %}active{% endif %}">
-                            <i class="fas fa-comments"></i>
-                            <span>Communication Hub</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-
-            <nav class="nav-section">
-                <h3 class="nav-section-title">Tools</h3>
-                <ul class="nav-menu">
-                    <li class="nav-item">
-                        <a href="/highlights" class="nav-link {% if request.path == '/highlights' %}active{% endif %}">
-                            <i class="fas fa-highlighter"></i>
-                            <span>Highlights</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="/analytics" class="nav-link {% if request.path == '/analytics' %}active{% endif %}">
-                            <i class="fas fa-chart-bar"></i>
-                            <span>Analytics</span>
-                        </a>
-                    </li>
-                </ul>
-            </nav>
-        </aside>
-
-        <!-- Main Content -->
-        <main class="main-content">
-            <header class="main-header">
-                <h1 class="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
-                <p class="page-subtitle">{% block page_subtitle %}Welcome to Elite Athletes CRM{% endblock %}</p>
-            </header>
-
-            <div class="content-area">
-                {% block content %}
-                <!-- Content will be injected here by child templates -->
-                {% endblock %}
-            </div>
-        </main>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-container">
+      <div class="nav-brand">
+        <i class="fa-solid fa-dumbbell"></i>
+        <span>Elite Athletes</span>
+      </div>
+      
+      <div class="nav-menu">
+        <a href="/athletes" class="nav-link {% if request.path == '/athletes' %}active{% endif %}">
+          <i class="fa-solid fa-users"></i>
+          <span>Atletas</span>
+        </a>
+        <a href="/coach/todos" class="nav-link {% if request.path == '/coach/todos' %}active{% endif %}">
+          <i class="fa-solid fa-table-columns"></i>
+          <span>To-Dos</span>
+        </a>
+      </div>
+      
+      <div class="nav-actions">
+        <button class="btn" id="btnSearch" title="Buscar (Ctrl+K)">
+          <i class="fa-solid fa-search"></i>
+        </button>
+        <button class="btn" id="btnNotifications" title="Notificaciones">
+          <i class="fa-solid fa-bell"></i>
+        </button>
+      </div>
     </div>
+  </nav>
 
-    <!-- Block for additional scripts -->
-    {% block extra_js %}{% endblock %}
-    
-    <script>
-        // Update athlete count dynamically
-        async function updateAthleteCount() {
-            try {
-                const response = await fetch('/api/athletes');
-                const data = await response.json();
-                const count = data.athletes ? data.athletes.length : 0;
-                
-                const badge = document.getElementById('athleteCount');
-                if (badge) {
-                    badge.textContent = count;
-                }
-            } catch (error) {
-                console.error('Error updating athlete count:', error);
-            }
+  <!-- Main Content -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Toasts Container -->
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Scripts -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/outreach.js"></script>
+  {% block scripts %}{% endblock %}
+  
+  <script>
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Ctrl/Cmd + K for global search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        const searchBtn = document.getElementById('btnSearch');
+        if (searchBtn) {
+          searchBtn.click();
         }
-
-        // Update count when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            updateAthleteCount();
-        });
-    </script>
+      }
+    });
+    
+    // Navigation active state
+    const currentPath = window.location.pathname;
+    document.querySelectorAll('.nav-link').forEach(link => {
+      if (link.getAttribute('href') === currentPath) {
+        link.classList.add('active');
+      }
+    });
+  </script>
 </body>
-</html> 
+</html>

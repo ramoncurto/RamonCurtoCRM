@@ -7,13 +7,16 @@ import sqlite3
 import hashlib
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
 import os
 
 # OpenAI imports
 from openai import AsyncOpenAI
+
+# Configuration
+AUTO_GPT_ENABLED = os.getenv("AUTO_GPT_ENABLED", "true").lower() == "true"
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +225,10 @@ class WorkflowService:
     
     async def _suggest_reply(self, message_id: int, athlete_id: int) -> Optional[str]:
         """Suggest a reply using GPT-4o-mini"""
+        # Check if automatic GPT is enabled
+        if not AUTO_GPT_ENABLED:
+            return None
+            
         try:
             # Get conversation context
             conn = self._get_db_connection()
@@ -289,6 +296,10 @@ class WorkflowService:
     
     async def _detect_todo(self, message_id: int, athlete_id: int) -> Optional[Dict]:
         """Detect if message contains actionable request"""
+        # Check if automatic GPT is enabled
+        if not AUTO_GPT_ENABLED:
+            return None
+            
         try:
             # Get the message content
             conn = self._get_db_connection()

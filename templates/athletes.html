@@ -1,488 +1,85 @@
 {% extends "base.html" %}
 
-{% block title %}Elite Athletes • Athletes Management{% endblock %}
-{% block page_title %}Athletes Management{% endblock %}
-{% block page_subtitle %}Manage your athlete profiles and information{% endblock %}
-
-{% block extra_css %}
-<style>
-    /* Athletes specific styles */
-    .athletes-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: var(--space-6);
-    }
-
-    .athletes-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: var(--space-6);
-    }
-
-    .athlete-card {
-        background: var(--bg-secondary);
-        border: 1px solid var(--border-primary);
-        border-radius: var(--radius-xl);
-        padding: var(--space-6);
-        transition: all var(--transition-fast);
-        cursor: pointer;
-    }
-
-    .athlete-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-lg);
-        border-color: var(--primary-500);
-    }
-
-    .athlete-header {
-        display: flex;
-        align-items: center;
-        gap: var(--space-4);
-        margin-bottom: var(--space-4);
-    }
-
-    .athlete-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, var(--primary-500), var(--secondary-500));
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: white;
-    }
-
-    .athlete-info h3 {
-        font-size: 1.125rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: var(--space-1);
-    }
-
-    .athlete-details {
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-    }
-
-    .athlete-stats {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: var(--space-4);
-        margin-bottom: var(--space-4);
-    }
-
-    .stat-item {
-        text-align: center;
-        padding: var(--space-3);
-        background: var(--bg-tertiary);
-        border-radius: var(--radius-lg);
-    }
-
-    .stat-number {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--text-primary);
-        margin-bottom: var(--space-1);
-    }
-
-    .stat-label {
-        font-size: 0.75rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .athlete-actions {
-        display: flex;
-        gap: var(--space-2);
-    }
-
-    /* Form validation styles */
-    .form-error {
-        color: var(--error-500);
-        font-size: var(--font-size-xs);
-        margin-top: var(--space-1);
-        min-height: 1rem;
-    }
-
-    .form-control:invalid:not(:placeholder-shown) {
-        border-color: var(--error-500);
-    }
-
-    .form-control:valid:not(:placeholder-shown) {
-        border-color: var(--success-500);
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-        .athletes-header {
-            flex-direction: column;
-            gap: var(--space-4);
-            align-items: stretch;
-        }
-
-        .athletes-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>
-{% endblock %}
+{% block title %}Atletas • Gestión{% endblock %}
 
 {% block content %}
-<div class="athletes-header">
-    <div>
-        <h2 style="font-size: 1.5rem; font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-2);">
-            All Athletes
-        </h2>
-        <p style="color: var(--text-secondary);">Manage your athlete profiles and track their progress</p>
-    </div>
-    <button class="btn btn-primary" onclick="openAddAthleteModal()">
-        <i class="fas fa-plus"></i>
-        Add Athlete
-    </button>
-</div>
-
-<div class="athletes-grid" id="athletesGrid">
-    <!-- Athlete cards will be dynamically loaded here -->
-</div>
-
-<!-- Add/Edit Athlete Modal -->
-<div class="modal-overlay" id="athleteModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3 id="modalTitle">Add New Athlete</h3>
-            <button class="modal-close" onclick="closeAthleteModal()">
-                <i class="fas fa-times"></i>
+<div class="app">
+  <div class="panel">
+    <!-- Unified Toolbar -->
+    <div class="header">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <h1>Lista de Atletas</h1>
+        </div>
+        
+        <div class="toolbar-center">
+          <div class="search-container">
+            <i class="fa-solid fa-search search-icon"></i>
+            <input class="input search-input" id="search" placeholder="Buscar atletas..." />
+          </div>
+          
+          <div class="filters">
+            <select class="input filter-select" id="filterSport">
+              <option value="">Todos los deportes</option>
+            </select>
+            <select class="input filter-select" id="filterLevel">
+              <option value="">Todos los niveles</option>
+            </select>
+            <select class="input filter-select" id="filterRisk">
+              <option value="">Todos los riesgos</option>
+              <option value="bajo">Riesgo Bajo</option>
+              <option value="medio">Riesgo Medio</option>
+              <option value="alto">Riesgo Alto</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="toolbar-right">
+          <div class="saved-views">
+            <button class="btn btn-icon" id="btnSavedViews" title="Vistas guardadas">
+              <i class="fa-solid fa-bookmark"></i>
             </button>
+          </div>
+          <button class="btn warning" id="btnRiskAssessment" title="Evaluar riesgo de todos los atletas (Ctrl+R)">
+            <i class="fa-solid fa-calculator"></i>
+            Evaluar Riesgo
+          </button>
+          <button class="btn primary" id="btnNew">
+            <i class="fa-solid fa-user-plus"></i>
+            Nuevo atleta
+          </button>
         </div>
-        <div class="modal-body">
-            <form id="athleteForm">
-                <div class="form-group">
-                    <label for="athleteName">Full Name *</label>
-                    <input type="text" id="athleteName" name="name" class="form-control" required 
-                           minlength="2" maxlength="100" 
-                           pattern="[A-Za-zÀ-ÿ\s]+" 
-                           title="Please enter a valid name (letters and spaces only)">
-                    <div class="form-error" id="nameError"></div>
-                </div>
-                <div class="form-group">
-                    <label for="athleteEmail">Email</label>
-                    <input type="email" id="athleteEmail" name="email" class="form-control" 
-                           pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" 
-                           title="Please enter a valid email address">
-                    <div class="form-error" id="emailError"></div>
-                </div>
-                <div class="form-group">
-                    <label for="athletePhone">Phone</label>
-                    <input type="tel" id="athletePhone" name="phone" class="form-control" 
-                           pattern="[\+]?[0-9\s\-\(\)]+" 
-                           title="Please enter a valid phone number">
-                    <div class="form-error" id="phoneError"></div>
-                </div>
-                <div class="form-group">
-                    <label for="athleteSport">Sport</label>
-                    <input type="text" id="athleteSport" name="sport" class="form-control" 
-                           maxlength="50">
-                </div>
-                <div class="form-group">
-                    <label for="athleteLevel">Level</label>
-                    <select id="athleteLevel" name="level" class="form-control">
-                        <option value="">Select Level</option>
-                        <option value="Beginner">Beginner</option>
-                        <option value="Intermediate">Intermediate</option>
-                        <option value="Advanced">Advanced</option>
-                        <option value="Elite">Elite</option>
-                        <option value="Professional">Professional</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="athleteNotes">Notes</label>
-                    <textarea id="athleteNotes" name="notes" rows="3" class="form-control" 
-                              maxlength="500"></textarea>
-                    <div class="form-error" id="notesError"></div>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeAthleteModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="saveAthleteBtn" disabled>
-                        <span>Save Athlete</span>
-                    </button>
-                </div>
-            </form>
-        </div>
+      </div>
     </div>
+    
+    <div class="content">
+      <table aria-label="Tabla de atletas" class="athletes-table">
+        <thead>
+          <tr>
+            <th class="id">ID</th>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Teléfono</th>
+            <th>Deporte</th>
+            <th>Nivel</th>
+            <th>Riesgo</th>
+            <th>Último contacto</th>
+            <th>To-Dos abiertos</th>
+            <th class="actions-header">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="empty" class="empty" style="display:none">
+        <i class="fa-regular fa-user"></i>
+        <p>No hay atletas.</p>
+        <button class="btn primary" onclick="createNewAthlete()">Crear primer atleta</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-    let athletes = [];
-    let editingAthleteId = null;
-
-    // Load athletes from API
-    async function loadAthletes() {
-        try {
-            const response = await fetch('/api/athletes');
-            const data = await response.json();
-            athletes = data.athletes || [];
-            renderAthletes();
-        } catch (error) {
-            console.error('Error loading athletes:', error);
-            showNotification('Error loading athletes', 'error');
-        }
-    }
-
-    // Render athletes in the grid
-    function renderAthletes() {
-        const grid = document.getElementById('athletesGrid');
-        grid.innerHTML = '';
-
-        if (athletes.length === 0) {
-            grid.innerHTML = `
-                <div style="grid-column: 1 / -1; text-align: center; padding: var(--space-12); color: var(--text-secondary);">
-                    <i class="fas fa-users" style="font-size: 3rem; margin-bottom: var(--space-4); display: block;"></i>
-                    <h3 style="margin-bottom: var(--space-2);">No Athletes Yet</h3>
-                    <p>Start by adding your first athlete to the system.</p>
-                </div>
-            `;
-            return;
-        }
-
-        athletes.forEach(athlete => {
-            const card = createAthleteCard(athlete);
-            grid.appendChild(card);
-        });
-    }
-
-    // Create athlete card element
-    function createAthleteCard(athlete) {
-        const card = document.createElement('div');
-        card.className = 'athlete-card animate-fade-in';
-        
-        const initials = athlete.name.split(' ').map(n => n[0]).join('');
-        
-        card.innerHTML = `
-            <div class="athlete-header">
-                <div class="athlete-avatar">${initials}</div>
-                <div class="athlete-info">
-                    <h3>${athlete.name}</h3>
-                    <div class="athlete-details">
-                        ${athlete.sport ? athlete.sport : ''}${athlete.sport && athlete.level ? ' • ' : ''}${athlete.level ? athlete.level : ''}
-                    </div>
-                </div>
-            </div>
-            
-            <div class="athlete-stats">
-                <div class="stat-item">
-                    <div class="stat-number">12</div>
-                    <div class="stat-label">Conversations</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number">8</div>
-                    <div class="stat-label">Highlights</div>
-                </div>
-            </div>
-            
-            <div class="athlete-actions">
-                <button class="btn btn-secondary" onclick="viewAthlete(${athlete.id})">
-                    <i class="fas fa-eye"></i>
-                    View
-                </button>
-                <button class="btn btn-secondary" onclick="editAthlete(${athlete.id})">
-                    <i class="fas fa-edit"></i>
-                    Edit
-                </button>
-                <button class="btn btn-primary" onclick="openCommunicationHub(${athlete.id})">
-                    <i class="fas fa-comments"></i>
-                    Chat
-                </button>
-            </div>
-        `;
-        
-        return card;
-    }
-
-    // Modal functions
-    function openAddAthleteModal() {
-        editingAthleteId = null;
-        document.getElementById('modalTitle').textContent = 'Add New Athlete';
-        document.getElementById('athleteForm').reset();
-        document.getElementById('athleteModal').classList.add('show');
-    }
-
-    function closeAthleteModal() {
-        document.getElementById('athleteModal').classList.remove('show');
-        editingAthleteId = null;
-    }
-
-    function editAthlete(athleteId) {
-        const athlete = athletes.find(a => a.id === athleteId);
-        if (!athlete) return;
-
-        editingAthleteId = athleteId;
-        document.getElementById('modalTitle').textContent = 'Edit Athlete';
-        
-        // Populate form
-        document.getElementById('athleteName').value = athlete.name || '';
-        document.getElementById('athleteEmail').value = athlete.email || '';
-        document.getElementById('athletePhone').value = athlete.phone || '';
-        document.getElementById('athleteSport').value = athlete.sport || '';
-        document.getElementById('athleteLevel').value = athlete.level || '';
-        document.getElementById('athleteNotes').value = athlete.notes || '';
-        
-        document.getElementById('athleteModal').classList.add('show');
-    }
-
-    function viewAthlete(athleteId) {
-        // Navigate to athlete detail page or open modal
-        window.location.href = `/athletes/${athleteId}`;
-    }
-
-    function openCommunicationHub(athleteId) {
-        window.location.href = `/communication-hub?athlete=${athleteId}`;
-    }
-
-    // Form validation
-    function validateForm() {
-        const form = document.getElementById('athleteForm');
-        const saveBtn = document.getElementById('saveAthleteBtn');
-        const nameInput = document.getElementById('athleteName');
-        const emailInput = document.getElementById('athleteEmail');
-        const phoneInput = document.getElementById('athletePhone');
-        
-        let isValid = true;
-        
-        // Clear previous errors
-        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
-        
-        // Validate name (required)
-        if (!nameInput.value.trim()) {
-            document.getElementById('nameError').textContent = 'Name is required';
-            isValid = false;
-        } else if (nameInput.value.trim().length < 2) {
-            document.getElementById('nameError').textContent = 'Name must be at least 2 characters';
-            isValid = false;
-        }
-        
-        // Validate email (optional but must be valid if provided)
-        if (emailInput.value.trim() && !emailInput.checkValidity()) {
-            document.getElementById('emailError').textContent = 'Please enter a valid email address';
-            isValid = false;
-        }
-        
-        // Validate phone (optional but must be valid if provided)
-        if (phoneInput.value.trim() && !phoneInput.checkValidity()) {
-            document.getElementById('phoneError').textContent = 'Please enter a valid phone number';
-            isValid = false;
-        }
-        
-        // Enable/disable save button
-        saveBtn.disabled = !isValid;
-        
-        return isValid;
-    }
-    
-    // Add real-time validation
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('athleteForm');
-        const inputs = form.querySelectorAll('input, select, textarea');
-        
-        inputs.forEach(input => {
-            input.addEventListener('input', validateForm);
-            input.addEventListener('blur', validateForm);
-        });
-        
-        // Initial validation
-        validateForm();
-    });
-
-    // Form submission
-    document.getElementById('athleteForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        if (!validateForm()) {
-            showNotification('Please fix the form errors before saving', 'error');
-            return;
-        }
-        
-        const saveBtn = document.getElementById('saveAthleteBtn');
-        const originalText = saveBtn.innerHTML;
-        saveBtn.innerHTML = '<div class="loading-spinner"></div> Saving...';
-        saveBtn.disabled = true;
-
-        try {
-            const formData = new FormData();
-            formData.append('name', document.getElementById('athleteName').value.trim());
-            formData.append('email', document.getElementById('athleteEmail').value.trim());
-            formData.append('phone', document.getElementById('athletePhone').value.trim());
-            formData.append('sport', document.getElementById('athleteSport').value.trim());
-            formData.append('level', document.getElementById('athleteLevel').value);
-            formData.append('notes', document.getElementById('athleteNotes').value.trim());
-
-            const url = editingAthleteId ? `/api/athletes/${editingAthleteId}` : '/api/athletes';
-            const method = editingAthleteId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method: method,
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.status === 'created' || data.status === 'updated') {
-                showNotification(
-                    editingAthleteId ? 'Athlete updated successfully!' : 'Athlete created successfully!', 
-                    'success'
-                );
-                closeAthleteModal();
-                loadAthletes();
-            } else {
-                throw new Error(data.message || 'Failed to save athlete');
-            }
-
-        } catch (error) {
-            console.error('Error saving athlete:', error);
-            showNotification('Error saving athlete: ' + error.message, 'error');
-        } finally {
-            saveBtn.innerHTML = originalText;
-            saveBtn.disabled = false;
-        }
-    });
-
-    // Notification function
-    function showNotification(message, type = 'info') {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center; gap: var(--space-3);">
-                <div style="font-size: 1.25rem;">
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                </div>
-                <div>
-                    <div style="font-weight: 600; font-size: 0.875rem;">${message}</div>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        // Show notification
-        setTimeout(() => notification.classList.add('show'), 100);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-
-    // Initialize
-    document.addEventListener('DOMContentLoaded', function() {
-        loadAthletes();
-    });
-</script>
+{% block scripts %}
+<script src="/static/js/athletes.js"></script>
 {% endblock %}

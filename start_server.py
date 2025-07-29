@@ -66,10 +66,8 @@ def start_server():
     print("🚀 Starting Elite Athlete CRM Server...")
     print("📍 Server will be available at: http://localhost:8000")
     print("\n🔗 Quick Links:")
-    print("   Dashboard: http://localhost:8000/dashboard")
     print("   Athletes: http://localhost:8000/athletes")
-    print("   History: http://localhost:8000/history")
-    print("   Communication Hub: http://localhost:8000/communication-hub")
+    print("   Coach Todos: http://localhost:8000/coach/todos")
     print("\n⚡ Press Ctrl+C to stop the server\n")
     
     # Wait a moment before opening browser
@@ -77,7 +75,7 @@ def start_server():
     
     # Open browser
     try:
-        webbrowser.open('http://localhost:8000/dashboard')
+        webbrowser.open('http://localhost:8000/athletes')
     except:
         pass
     

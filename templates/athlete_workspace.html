@@ -1,0 +1,750 @@
+{% extends "base.html" %}
+
+{% block title %}{{ athlete_name }} • Workspace{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Layout 40/60 with sticky composer */
+  .app {
+    display: grid;
+    grid-template-columns: 40% 60%;
+    gap: var(--gap);
+    height: calc(100vh - 120px);
+    position: relative;
+  }
+  
+  /* Left panel with sticky composer */
+  .panel#left {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  
+  .panel-header {
+    position: sticky;
+    top: 0;
+    background: linear-gradient(180deg, var(--bg-2) 60%, rgba(17,24,39,0));
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+    z-index: 5;
+  }
+  
+  .risk-assessment {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .risk-assessment .risk-chip {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  .risk-assessment .risk-explanations {
+    font-size: 12px;
+    color: var(--text-3);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .panel-body {
+    padding: 16px;
+    overflow: auto;
+    display: flex;
+    gap: 16px;
+    flex-direction: column;
+    flex: 1;
+  }
+  
+  /* Sticky composer at bottom */
+  .composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-2);
+    border-top: 1px solid var(--border);
+    padding: 16px;
+    margin: 0 -16px -16px -16px;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+  }
+  
+  /* Timeline with day separators */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  
+  /* Day separator */
+  .day-separator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0 12px 0;
+    color: var(--text-3);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  
+  .day-separator::before {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  
+  .day-separator::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  
+  /* Message bubble with floating actions */
+  .bubble {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    position: relative;
+    transition: .12s;
+  }
+  
+  .bubble:hover {
+    border-color: var(--primary);
+  }
+  
+  .bubble.selected {
+    outline: 2px solid var(--primary);
+  }
+  
+  /* Audio indicator */
+  .audio-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-3);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  
+  .audio-indicator i {
+    color: var(--primary);
+  }
+  
+  .audio-duration {
+    font-weight: 500;
+    color: var(--text-2);
+  }
+  
+  /* Floating action bar */
+  .floating-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: all 0.2s ease;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .bubble:hover .floating-actions {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  .floating-actions .btn {
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    min-width: auto;
+  }
+  
+  .bubble .meta {
+    color: var(--text-3);
+    font-size: 12px;
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+  
+  /* Dropzone */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-3);
+    cursor: pointer;
+    transition: .15s;
+  }
+  
+  .dropzone.drag {
+    border-color: var(--primary);
+    background: rgba(99,102,241,.08);
+  }
+  
+  .dropzone input {
+    display: none;
+  }
+  
+  /* Right: highlight + create todo for coach */
+  .card {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .h-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  
+  .h-chip {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #fff;
+    opacity: .85;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+  
+  .h-chip:hover {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  
+  .h-chip.tech { background: #34d399; border-color: #10b981; }
+  .h-chip.nutri { background: #f59e0b; border-color: #d97706; }
+  .h-chip.recov { background: #60a5fa; border-color: #3b82f6; }
+  .h-chip.psy { background: #a78bfa; border-color: #8b5cf6; }
+  .h-chip.injury { background: #ef4444; border-color: #dc2626; }
+  .h-chip.performance { background: #f97316; border-color: #ea580c; }
+  .h-chip.training { background: #06b6d4; border-color: #0891b2; }
+  .h-chip.general { background: #6b7280; border-color: #4b5563; }
+  .h-chip.progress { background: #10b981; border-color: #059669; }
+  .h-chip.issue { background: #dc2626; border-color: #b91c1c; }
+  .h-chip.planning { background: #8b5cf6; border-color: #7c3aed; }
+  .h-chip.active { opacity: 1; box-shadow: 0 0 0 2px rgba(255,255,255,.15); }
+  .h-chip.add-tag { background: var(--bg-4); border-color: var(--border); color: var(--text-2); opacity: 0.7; }
+  .h-chip.add-tag:hover { opacity: 1; background: var(--primary); }
+  
+  /* Highlights improvements */
+  .highlights-header {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  
+  .highlights-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .highlights-title h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  
+  .highlights-counter {
+    background: var(--primary);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  
+  .category-filters {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  
+  .category-chip {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+    background: var(--bg-4);
+    color: var(--text-2);
+  }
+  
+  .category-chip:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  
+  .category-chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  
+  /* Highlights preview modal */
+  .highlights-preview-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+  }
+  
+  .highlights-preview-modal.show {
+    opacity: 1;
+    visibility: visible;
+  }
+  
+  .highlights-preview-content {
+    background: var(--bg-2);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .highlights-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  
+  .highlights-preview-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  
+  .highlights-preview-close {
+    background: none;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  
+  .highlights-preview-close:hover {
+    background: var(--bg-4);
+    color: var(--text-1);
+  }
+  
+  .highlights-preview-subtitle {
+    color: var(--text-2);
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  
+  .highlights-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  
+  .highlight-preview-item {
+    background: var(--bg-4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s;
+  }
+  
+  .highlight-preview-item:hover {
+    border-color: var(--primary);
+    background: var(--bg-3);
+  }
+  
+  .highlight-preview-item.selected {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+  }
+  
+  .highlight-preview-text {
+    font-size: 14px;
+    color: var(--text-1);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+  
+  .highlight-preview-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  
+  .highlight-preview-tag {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    color: white;
+    opacity: 0.9;
+  }
+  
+  .highlight-preview-tag.tech { background: #34d399; }
+  .highlight-preview-tag.nutri { background: #f59e0b; }
+  .highlight-preview-tag.psy { background: #a78bfa; }
+  .highlight-preview-tag.injury { background: #ef4444; }
+  .highlight-preview-tag.planning { background: #8b5cf6; }
+  .highlight-preview-tag.goals { background: #10b981; }
+  .highlight-preview-tag.problems { background: #dc2626; }
+  .highlight-preview-tag.progress { background: #06b6d4; }
+  .highlight-preview-tag.general { background: #6b7280; }
+  
+  .highlights-preview-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  
+  .highlights-preview-actions .btn {
+    min-width: 100px;
+  }
+  
+  .highlights-preview-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .highlights-preview-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary);
+  }
+  
+  .highlights-preview-checkbox label {
+    font-size: 13px;
+    color: var(--text-2);
+    cursor: pointer;
+  }
+  
+  /* Compact highlight cards */
+  .highlight-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--bg-4);
+    border: 1px solid var(--border);
+    margin-bottom: 8px;
+    transition: all 0.2s;
+  }
+  
+  .highlight-item:hover {
+    border-color: var(--primary);
+    background: var(--bg-3);
+  }
+  
+  .highlight-item.pinned {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.1);
+  }
+  
+  .highlight-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  
+  .highlight-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-1);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .highlight-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  
+  .highlight-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  
+  .highlight-tag {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+    color: white;
+    opacity: 0.8;
+  }
+  
+  .highlight-actions {
+    display: flex;
+    gap: 4px;
+    align-items: flex-start;
+  }
+  
+  .highlight-actions .btn {
+    padding: 4px 6px;
+    font-size: 11px;
+    border-radius: 4px;
+    min-width: auto;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+  
+  .highlight-actions .btn:hover {
+    opacity: 1;
+  }
+  
+  .highlight-item:hover .highlight-actions .btn {
+    opacity: 1;
+  }
+  
+  .pin-button {
+    color: var(--primary);
+  }
+  
+  .pin-button.pinned {
+    color: var(--primary);
+    opacity: 1;
+  }
+  
+  .edit-button {
+    color: var(--text-2);
+  }
+  
+  .delete-button {
+    color: var(--danger);
+  }
+  
+  .todo-button {
+    color: var(--success);
+  }
+  
+  .todo-mini {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .todo-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  
+  .prio {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: #fff;
+  }
+  
+  .P1 { background: #ef4444; }
+  .P2 { background: #f59e0b; }
+  .P3 { background: #10b981; }
+  
+  @media(max-width: 1100px) {
+    .app {
+      grid-template-columns: 1fr;
+      height: auto;
+    }
+    
+    body {
+      height: auto;
+    }
+    
+    .composer {
+      position: relative;
+      margin: 0;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app" data-athlete-id="{{ athlete_id }}" aria-label="Workspace de atleta">
+  <!-- LEFT: Conversación / Timeline -->
+  <section class="panel" id="left">
+    <header class="panel-header">
+      <div class="row">
+        <h2>Conversación</h2>
+        <span class="badge" id="athleteName">{{ athlete_name }}</span>
+        <div class="risk-assessment" id="riskAssessment">
+          <!-- Risk chip will be loaded here -->
+          <button class="btn mini info" onclick="triggerRiskAssessment()" title="Evaluar riesgo manualmente">
+            <i class="fa-solid fa-chart-line"></i> Evaluar Riesgo
+          </button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="dropzone" id="dropzone">
+          <i class="fa-solid fa-microphone-lines"></i>
+          <span id="dropLabel">Arrastra un audio o haz clic</span>
+          <input type="file" id="audioInput" accept="audio/*" />
+        </label>
+        <button class="btn" id="btnTranscribir">
+          <i class="fa-solid fa-wave-square"></i> Transcribir
+        </button>
+        <button class="btn info" id="btnResponder">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> Respuesta IA
+        </button>
+      </div>
+    </header>
+    
+    <div class="panel-body">
+      <!-- Timeline content -->
+      <div class="timeline" id="timeline"></div>
+      <div class="empty" id="emptyTimeline" style="display:none">No hay mensajes.</div>
+      
+      <!-- Sticky composer at bottom -->
+      <div class="composer">
+        <div class="row" style="width:100%">
+          <input class="input" id="inputMensaje" placeholder="Escribe o pega el mensaje del atleta y Enter…" />
+          <button class="btn primary" id="btnAgregar">
+            <i class="fa-solid fa-plus"></i> Añadir
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Highlights del atleta + Crear To‑Do para entrenador + To‑Dos de este atleta -->
+  <section class="panel" id="right">
+    <header class="panel-header">
+      <div class="row">
+        <h2>Highlights del atleta</h2>
+      </div>
+    </header>
+    <div class="panel-body">
+      <!-- Crear To‑Do para entrenador (desde este atleta) -->
+      <div class="card">
+        <div class="title">Enviar To‑Do al entrenador</div>
+        <div class="todo-mini">
+          <input class="input" id="todoText" placeholder="¿Qué debe hacer el entrenador?" />
+          <div class="todo-row">
+            <select class="input" id="todoPriority" style="width:auto">
+              <option value="P2" selected>Prioridad P2</option>
+              <option value="P1">Prioridad P1</option>
+              <option value="P3">Prioridad P3</option>
+            </select>
+            <input type="date" class="input" id="todoDue" style="width:auto" />
+            <span class="tag" id="todoPreview">P2</span>
+            <span class="spacer"></span>
+            <button class="btn primary" id="btnSendTodo">
+              <i class="fa-solid fa-paper-plane"></i> Enviar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Highlights del atleta -->
+      <div class="card">
+        <div class="highlights-header">
+          <div class="highlights-title">
+            <h3>Highlights</h3>
+            <span class="highlights-counter" id="highlightsCounter">0</span>
+          </div>
+          <div class="category-filters" id="categoryFilters">
+            <!-- Category chips will be rendered here -->
+          </div>
+        </div>
+        <div id="highlights"></div>
+      </div>
+
+      <!-- To‑Dos de este atleta -->
+      <div class="card">
+        <div class="title">To‑Dos de este atleta</div>
+        <div id="todos"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Highlights Preview Modal -->
+<div class="highlights-preview-modal" id="highlightsPreviewModal">
+  <div class="highlights-preview-content">
+    <div class="highlights-preview-header">
+      <h3 class="highlights-preview-title">Highlights Sugeridos</h3>
+      <button class="highlights-preview-close" id="closeHighlightsPreview">
+        <i class="fa-solid fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="highlights-preview-subtitle">
+      Se han detectado los siguientes highlights importantes. Selecciona los que quieres guardar:
+    </div>
+    
+    <div class="highlights-preview-list" id="highlightsPreviewList">
+      <!-- Highlights will be rendered here -->
+    </div>
+    
+    <div class="highlights-preview-actions">
+      <button class="btn" id="cancelHighlightsPreview">Cancelar</button>
+      <button class="btn primary" id="saveHighlightsPreview">
+        <i class="fa-solid fa-check"></i> Guardar Seleccionados
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/workspace.js"></script>
+{% endblock %}

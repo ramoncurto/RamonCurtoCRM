@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}To-Dos del Entrenador{% endblock %}
+
+{% block extra_css %}
+<style>
+  .app{display:flex;flex-direction:column;gap:var(--gap);height:calc(100vh - 120px);}
+  
+  /* Enhanced Header with Micro-Flow */
+  .header{display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:1px solid var(--border);background:var(--bg-2);}
+  .micro-flow{display:flex;align-items:center;gap:12px;flex:1;max-width:600px;margin:0 24px;}
+  .micro-input{flex:1;position:relative;}
+  .micro-input input{padding:12px 16px;padding-left:40px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:14px;width:100%;}
+  .micro-input input:focus{border-color:var(--primary);background:var(--bg-2);outline:none;}
+  .micro-input i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:14px;}
+  .quick-chips{display:flex;gap:8px;}
+  .quick-chip{background:var(--bg-4);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;transition:.12s;color:var(--text-2);}
+  .quick-chip:hover{background:var(--bg-3);border-color:var(--primary);color:var(--text);}
+  .quick-chip.active{background:var(--primary);border-color:var(--primary);color:white;}
+  .send-btn{background:var(--primary);color:white;border:none;border-radius:var(--radius-sm);padding:12px 16px;font-size:14px;font-weight:600;cursor:pointer;transition:.12s;}
+  .send-btn:hover{background:var(--primary-600);}
+  .send-btn:disabled{background:var(--bg-4);color:var(--text-3);cursor:not-allowed;}
+  
+  /* Enhanced Filters with Bulk Actions */
+  .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--bg-2);}
+  .bulk-actions{display:flex;gap:8px;align-items:center;margin-left:auto;}
+  .bulk-actions.hidden{display:none;}
+  .bulk-count{background:var(--primary);color:white;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+  .saved-views{display:flex;gap:8px;align-items:center;}
+  .view-chip{background:var(--bg-4);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;transition:.12s;color:var(--text-2);}
+  .view-chip:hover{background:var(--bg-3);border-color:var(--primary);color:var(--text);}
+  .view-chip.active{background:var(--primary);border-color:var(--primary);color:white;}
+  
+  /* Enhanced Board with WIP Limits */
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;flex:1;overflow:hidden;}
+  .lane{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;overflow:hidden;}
+  .lane-header{background:var(--bg-3);padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-weight:700;}
+  .lane-info{display:flex;align-items:center;gap:8px;}
+  .wip-limit{font-size:12px;color:var(--text-3);}
+  .wip-limit.warning{color:var(--warning);}
+  .wip-limit.danger{color:var(--danger);}
+  .sla-indicator{width:8px;height:8px;border-radius:50%;margin-left:8px;}
+  .sla-green{background:var(--success);}
+  .sla-amber{background:var(--warning);}
+  .sla-red{background:var(--danger);}
+  .lane-body{padding:16px;overflow:auto;display:flex;flex-direction:column;gap:12px;flex:1;}
+  
+  /* Enhanced Cards with Drag Handle and Selection */
+  .card{background:var(--bg-3);border:1px solid var(--border);border-radius:12px;padding:12px;transition:.12s;position:relative;cursor:default;}
+  .card:hover{border-color:var(--primary);box-shadow:0 4px 12px rgba(0,0,0,.15);}
+  .card.dragging{opacity:.5;transform:rotate(2deg);}
+  .card.selected{border-color:var(--primary);background:rgba(99,102,241,0.1);}
+  .card .drag-handle{position:absolute;top:8px;left:8px;color:var(--text-3);cursor:grab;font-size:14px;opacity:0;transition:.12s;}
+  .card:hover .drag-handle{opacity:1;}
+  .card .drag-handle:active{cursor:grabbing;}
+  .card .title{font-weight:600;margin-bottom:8px;padding-left:24px;}
+  .card .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--text-2);}
+  .card .actions{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:8px;}
+  .quick-triage{position:absolute;top:8px;right:8px;background:var(--primary);color:white;border:none;border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;opacity:0;transition:.12s;}
+  .card:hover .quick-triage{opacity:1;}
+  
+  /* Context Preview Tooltip */
+  .context-preview{position:absolute;top:100%;left:0;right:0;background:var(--bg-1);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px;box-shadow:var(--shadow);z-index:100;opacity:0;visibility:hidden;transition:.12s;max-width:300px;}
+  .card:hover .context-preview{opacity:1;visibility:visible;}
+  .context-preview .context-title{font-weight:600;font-size:12px;color:var(--text-2);margin-bottom:4px;}
+  .context-preview .context-text{font-size:12px;color:var(--text);line-height:1.4;}
+  
+  .prio{padding:2px 8px;border-radius:999px;font-size:11px;color:#fff;font-weight:600;}
+  .P1{background:#ef4444}.P2{background:#f59e0b}.P3{background:#10b981}
+  .chip{background:var(--bg-4);border:1px solid var(--border);border-radius:999px;padding:4px 12px;font-size:12px;cursor:pointer;transition:.12s;}
+  .chip:hover{background:var(--bg-3);border-color:var(--primary);}
+  .chip.active{background:var(--primary);border-color:var(--primary);color:white;}
+  
+  /* Success Feedback */
+  .success-feedback{position:fixed;top:20px;right:20px;background:var(--success);color:white;padding:12px 16px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;z-index:1000;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);}
+  .undo-btn{background:rgba(255,255,255,0.2);border:none;color:white;padding:4px 8px;border-radius:4px;font-size:12px;cursor:pointer;margin-left:8px;}
+  .undo-btn:hover{background:rgba(255,255,255,0.3);}
+  
+  /* List View Enhancements */
+  .list-view{display:flex;flex-direction:column;gap:0;}
+  .list-header{display:grid;grid-template-columns:40px 2fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:12px;padding:12px 16px;background:var(--bg-3);border-bottom:1px solid var(--border);font-weight:700;font-size:12px;color:var(--text-2);}
+  .list-body{display:flex;flex-direction:column;}
+  .list-row{display:grid;grid-template-columns:40px 2fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);align-items:center;cursor:pointer;}
+  .list-row:hover{background:var(--bg-3);}
+  .list-row.selected{background:rgba(99,102,241,0.1);border-color:var(--primary);}
+  .list-row:last-child{border-bottom:none;}
+  .col{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .drag-over{background:rgba(99,102,241,.08);border-color:var(--primary);}
+  
+  /* Bulk Edit Modal */
+  .bulk-modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:1000;display:none;align-items:center;justify-content:center;}
+  .bulk-modal.show{display:flex;}
+  .bulk-modal-content{background:var(--bg-1);border-radius:var(--radius);padding:24px;max-width:400px;width:100%;margin:20px;}
+  .bulk-modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .bulk-modal-title{font-weight:700;font-size:18px;}
+  .bulk-modal-close{background:none;border:none;color:var(--text-3);cursor:pointer;font-size:20px;}
+  .bulk-modal-form{display:flex;flex-direction:column;gap:16px;}
+  .bulk-modal-field{display:flex;flex-direction:column;gap:8px;}
+  .bulk-modal-field label{font-weight:600;font-size:14px;}
+  .bulk-modal-field select,.bulk-modal-field input{padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-2);color:var(--text);}
+  .bulk-modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:16px;}
+  
+  @media(max-width:1200px){.board{grid-template-columns:1fr;}.lane{min-height:300px;}}
+  @media(max-width:768px){.micro-flow{flex-direction:column;gap:8px;}.quick-chips{flex-wrap:wrap;}.bulk-actions{display:none;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="app">
+  <!-- Enhanced Header with Micro-Flow -->
+  <div class="header">
+    <h1>To-Dos del Entrenador</h1>
+    
+    <div class="micro-flow">
+      <div class="micro-input">
+        <i class="fa-solid fa-plus"></i>
+        <input type="text" id="microInput" placeholder="Revisar técnica en bajadas @P1 mañana" />
+      </div>
+      <div class="quick-chips">
+        <div class="quick-chip" data-date="today">Hoy</div>
+        <div class="quick-chip" data-date="tomorrow">Mañana</div>
+        <div class="quick-chip" data-date="week">7 días</div>
+        <div class="quick-chip" data-date="none">Sin fecha</div>
+      </div>
+      <button class="send-btn" id="btnSendTodo" disabled>
+        <i class="fa-solid fa-paper-plane"></i>
+        Enviar
+      </button>
+    </div>
+    
+    <div class="header-actions">
+      <button class="btn" id="btnRefresh" title="Actualizar">
+        <i class="fa-solid fa-rotate"></i>
+      </button>
+    </div>
+  </div>
+  
+  <!-- Enhanced Filters with Bulk Actions -->
+  <div class="filters">
+    <input class="input" id="search" placeholder="Buscar To-Dos..." style="width:280px;" />
+    <select class="input" id="filterAthlete" style="width:auto;">
+      <option value="">Todos los atletas</option>
+    </select>
+    <div id="prioChips" class="row">
+      <div class="chip" data-p="">Todas</div>
+      <div class="chip" data-p="P1">P1</div>
+      <div class="chip" data-p="P2">P2</div>
+      <div class="chip" data-p="P3">P3</div>
+    </div>
+    <div id="viewChips" class="row">
+      <div class="chip active" data-view="kanban">Kanban</div>
+      <div class="chip" data-view="list">Lista</div>
+    </div>
+    <div class="saved-views">
+      <div class="view-chip" data-view="p1-week">P1 esta semana</div>
+      <div class="view-chip" data-view="new-by-athlete">Nuevos por atleta</div>
+      <div class="view-chip" data-view="overdue">Vencidos</div>
+    </div>
+    <div class="bulk-actions hidden" id="bulkActions">
+      <span class="bulk-count" id="bulkCount">0</span>
+      <button class="btn" id="btnBulkEdit" title="Editar seleccionados">
+        <i class="fa-solid fa-edit"></i>
+      </button>
+      <button class="btn" id="btnBulkMove" title="Mover seleccionados">
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+      <button class="btn danger" id="btnBulkDelete" title="Eliminar seleccionados">
+        <i class="fa-solid fa-trash"></i>
+      </button>
+    </div>
+  </div>
+  
+  <div class="content">
+    <div id="board" class="board">
+      <!-- Backlog -->
+      <div class="lane" data-status="backlog">
+        <div class="lane-header">
+          <div class="lane-info">
+            <span>Backlog</span>
+            <span class="wip-limit" id="wip-backlog">0/∞</span>
+          </div>
+          <span class="badge" id="count-backlog">0</span>
+        </div>
+        <div class="lane-body" id="lane-backlog"></div>
+      </div>
+      
+      <!-- En curso -->
+      <div class="lane" data-status="doing">
+        <div class="lane-header">
+          <div class="lane-info">
+            <span>En curso</span>
+            <span class="wip-limit" id="wip-doing">0/5</span>
+          </div>
+          <span class="badge" id="count-doing">0</span>
+        </div>
+        <div class="lane-body" id="lane-doing"></div>
+      </div>
+      
+      <!-- Hecho -->
+      <div class="lane" data-status="done">
+        <div class="lane-header">
+          <div class="lane-info">
+            <span>Hecho</span>
+            <span class="wip-limit" id="wip-done">0/∞</span>
+          </div>
+          <span class="badge" id="count-done">0</span>
+        </div>
+        <div class="lane-body" id="lane-done"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Success Feedback Toast -->
+<div id="successFeedback" class="success-feedback" style="display:none;">
+  <i class="fa-solid fa-check"></i>
+  <span id="feedbackText"></span>
+  <button class="undo-btn" id="undoBtn">Deshacer</button>
+</div>
+
+<!-- Bulk Edit Modal -->
+<div class="bulk-modal" id="bulkModal">
+  <div class="bulk-modal-content">
+    <div class="bulk-modal-header">
+      <div class="bulk-modal-title">Editar To-Dos Seleccionados</div>
+      <button class="bulk-modal-close" id="bulkModalClose">&times;</button>
+    </div>
+    <form class="bulk-modal-form" id="bulkForm">
+      <div class="bulk-modal-field">
+        <label>Prioridad</label>
+        <select id="bulkPriority">
+          <option value="">Sin cambios</option>
+          <option value="P1">P1</option>
+          <option value="P2">P2</option>
+          <option value="P3">P3</option>
+        </select>
+      </div>
+      <div class="bulk-modal-field">
+        <label>Estado</label>
+        <select id="bulkStatus">
+          <option value="">Sin cambios</option>
+          <option value="backlog">Backlog</option>
+          <option value="doing">En curso</option>
+          <option value="done">Hecho</option>
+        </select>
+      </div>
+      <div class="bulk-modal-field">
+        <label>Fecha límite</label>
+        <input type="date" id="bulkDueDate" />
+      </div>
+      <div class="bulk-modal-actions">
+        <button type="button" class="btn" id="bulkCancel">Cancelar</button>
+        <button type="submit" class="btn primary" id="bulkSave">Aplicar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/coach_todos.js"></script>
+{% endblock %}

@@ -1,12 +1,14 @@
 import os
 import sqlite3
 import datetime
+from datetime import datetime
 import logging
 from typing import Optional
 import re
 import json
+import math
 
-from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -22,12 +24,21 @@ from transcription_service import transcription_service
 from workflow_service import MessageEvent, WorkflowActions, workflow_service
 from workflow_endpoints import add_workflow_endpoints
 
+# Import GPT risk analyzer
+from gpt_risk_analysis import GPTRiskAnalyzer
+
+# Import AI outreach module
+from ai_outreach import generate_outreach
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Configuration
+AUTO_GPT_ENABLED = os.getenv("AUTO_GPT_ENABLED", "true").lower() == "true"
 
 # Initialize OpenAI client
 openai_client = AsyncOpenAI(
@@ -224,6 +235,36 @@ with conn:
     except sqlite3.OperationalError:
         pass  # Column already exists
 
+# Add new coach todos table
+def init_coach_todos_table():
+    """Initialize the coach todos table for global todo management"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coach_todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            athlete_id INTEGER,
+            text TEXT NOT NULL,
+            priority TEXT CHECK(priority IN ('P1', 'P2', 'P3')) DEFAULT 'P2',
+            status TEXT CHECK(status IN ('backlog', 'doing', 'done')) DEFAULT 'backlog',
+            due_date DATE,
+            created_by TEXT CHECK(created_by IN ('athlete', 'coach')) DEFAULT 'coach',
+            source_record_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (athlete_id) REFERENCES athletes(id)
+        )
+    """)
+    
+    # Create indexes for performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_coach_todos_athlete_id ON coach_todos(athlete_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_coach_todos_status ON coach_todos(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_coach_todos_priority ON coach_todos(priority)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_coach_todos_created_by ON coach_todos(created_by)")
+    
+    conn.commit()
+
+# Initialize coach todos table
+init_coach_todos_table()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -237,238 +278,9 @@ add_workflow_endpoints(app)
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    """Redirect root to dashboard."""
+    """Redirect to athletes page."""
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/dashboard")
-
-
-@app.get("/communication-hub", response_class=HTMLResponse)
-async def communication_hub(request: Request) -> HTMLResponse:
-    """Serve the omnichannel communication hub."""
-    return templates.TemplateResponse("communication_hub.html", {"request": request})
-
-
-@app.get("/communication-hub/athletes", response_class=JSONResponse)
-async def get_communication_athletes() -> JSONResponse:
-    """Get athletes for communication hub."""
-    with conn:
-        cursor = conn.execute(
-            """
-            SELECT a.id, a.name, a.email, a.phone, a.sport, a.level, a.created_at,
-                   COUNT(r.id) as total_conversations,
-                   MAX(r.timestamp) as last_conversation
-            FROM athletes a
-            LEFT JOIN records r ON a.id = r.athlete_id
-            GROUP BY a.id
-            ORDER BY a.name
-            """
-        )
-        athletes = cursor.fetchall()
-    
-    return JSONResponse({
-        "athletes": [
-            {
-                "id": a[0],
-                "name": a[1],
-                "email": a[2],
-                "phone": a[3],
-                "sport": a[4],
-                "level": a[5],
-                "created_at": a[6],
-                "total_conversations": a[7],
-                "last_conversation": a[8]
-            }
-            for a in athletes
-        ]
-    })
-
-
-@app.get("/communication-hub/athletes/{athlete_id}/conversations", response_class=JSONResponse)
-async def get_athlete_conversations(athlete_id: int) -> JSONResponse:
-    """Get all conversations for an athlete."""
-    with conn:
-        cursor = conn.execute(
-            """
-            SELECT r.id, r.timestamp, r.transcription, r.final_response, 
-                   r.category, r.priority, r.status, r.notes, r.source,
-                   r.external_message_id
-            FROM records r
-            WHERE r.athlete_id = ?
-            ORDER BY r.timestamp DESC
-            """,
-            (athlete_id,)
-        )
-        records = cursor.fetchall()
-    
-    return JSONResponse({
-        "conversations": [
-            {
-                "id": r[0],
-                "timestamp": r[1],
-                "transcription": r[2],
-                "final_response": r[3],
-                "category": r[4],
-                "priority": r[5],
-                "status": r[6],
-                "notes": r[7],
-                "source": r[8] if len(r) > 8 else "manual",
-                "external_message_id": r[9]
-            }
-            for r in records
-        ]
-    })
-
-
-@app.post("/communication-hub/send-message")
-async def send_communication_message(
-    athlete_id: int = Form(...),
-    message: str = Form(...),
-    platform: str = Form(...),
-    subject: str = Form("")
-) -> JSONResponse:
-    """Send a message to an athlete via specified platform."""
-    try:
-        # Get athlete information
-        with conn:
-            cursor = conn.execute(
-                "SELECT name, email, phone FROM athletes WHERE id = ?",
-                (athlete_id,)
-            )
-            athlete = cursor.fetchone()
-            
-        if not athlete:
-            return JSONResponse({"status": "error", "message": "Athlete not found"}, status_code=404)
-            
-        athlete_name, athlete_email, athlete_phone = athlete
-        
-        # Save the message to database
-        timestamp = datetime.datetime.now().isoformat()
-        
-        with conn:
-            conn.execute(
-                """
-                INSERT INTO records (
-                    athlete_id, timestamp, transcription, generated_response,
-                    final_response, category, priority, notes, status, source
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    athlete_id,
-                    timestamp,
-                    f"[OUTGOING via {platform.upper()}]: {message}",
-                    message,
-                    message,
-                    "outgoing",
-                    "medium",
-                    f"Sent via {platform}",
-                    "completed",
-                    platform
-                ),
-            )
-        
-        # Smart platform selection based on available contact info
-        if platform.lower() == "whatsapp" and athlete_phone:
-            # Send via WhatsApp if phone number is available
-            whatsapp_result = await send_whatsapp_message(athlete_phone, message)
-            if whatsapp_result["status"] == "sent":
-                return JSONResponse({
-                    "status": "sent", 
-                    "message": f"Message sent via WhatsApp to {athlete_name}",
-                    "timestamp": timestamp,
-                    "platform": "whatsapp"
-                })
-            elif whatsapp_result["status"] == "skipped":
-                return JSONResponse({
-                    "status": "saved", 
-                    "message": f"Message saved (WhatsApp not configured) for {athlete_name}",
-                    "timestamp": timestamp,
-                    "platform": "whatsapp"
-                })
-            else:
-                return JSONResponse({
-                    "status": "error", 
-                    "message": f"WhatsApp sending failed: {whatsapp_result.get('message', 'Unknown error')}"
-                }, status_code=500)
-        
-        elif platform.lower() == "email" and athlete_email:
-            # TODO: Implement email sending
-            return JSONResponse({
-                "status": "saved", 
-                "message": f"Message queued for email to {athlete_name}",
-                "timestamp": timestamp,
-                "platform": "email"
-            })
-        
-        elif platform.lower() == "sms" and athlete_phone:
-            # TODO: Implement SMS sending
-            return JSONResponse({
-                "status": "saved", 
-                "message": f"Message queued for SMS to {athlete_name}",
-                "timestamp": timestamp,
-                "platform": "sms"
-            })
-        
-        # Auto-select best available platform if not specified or not available
-        elif platform.lower() == "auto" or platform.lower() == "manual":
-            if athlete_phone:
-                # Try WhatsApp first
-                whatsapp_result = await send_whatsapp_message(athlete_phone, message)
-                if whatsapp_result["status"] == "sent":
-                    return JSONResponse({
-                        "status": "sent", 
-                        "message": f"Message sent via WhatsApp to {athlete_name}",
-                        "timestamp": timestamp,
-                        "platform": "whatsapp"
-                    })
-                elif whatsapp_result["status"] == "skipped":
-                    # WhatsApp not configured, save to database
-                    return JSONResponse({
-                        "status": "saved", 
-                        "message": f"Message saved for {athlete_name} (WhatsApp not configured)",
-                        "timestamp": timestamp,
-                        "platform": "whatsapp"
-                    })
-                else:
-                    # WhatsApp failed, save to database
-                    return JSONResponse({
-                        "status": "saved", 
-                        "message": f"Message saved for {athlete_name} (WhatsApp failed)",
-                        "timestamp": timestamp,
-                        "platform": "whatsapp"
-                    })
-            elif athlete_email:
-                # Try email
-                return JSONResponse({
-                    "status": "saved", 
-                    "message": f"Message queued for email to {athlete_name}",
-                    "timestamp": timestamp,
-                    "platform": "email"
-                })
-            else:
-                # No contact info available
-                return JSONResponse({
-                    "status": "saved", 
-                    "message": f"Message saved for {athlete_name} (no contact info available)",
-                    "timestamp": timestamp,
-                    "platform": "manual"
-                })
-        
-        else:
-            # For other platforms or when contact info is missing, just save to database
-            contact_info = "phone" if athlete_phone else "email" if athlete_email else "no contact info"
-            return JSONResponse({
-                "status": "saved", 
-                "message": f"Message saved for {athlete_name} via {platform} ({contact_info})",
-                "timestamp": timestamp,
-                "platform": platform
-            })
-            
-    except Exception as e:
-        logger.error(f"Error sending communication message: {e}")
-        return JSONResponse({
-            "status": "error",
-            "message": f"Error sending message: {str(e)}"
-        }, status_code=500)
+    return RedirectResponse(url="/athletes")
 
 
 @app.post("/transcribe")
@@ -491,7 +303,7 @@ async def transcribe(file: UploadFile = File(...)) -> JSONResponse:
     contents = await file.read()
     
     # Create a unique filename using timestamp to avoid collisions
-    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     safe_name = re.sub(r'[^\w\-_\.]', '_', file.filename)  # Sanitize filename
     filename = f"{timestamp}_{safe_name}"
     
@@ -666,6 +478,74 @@ async def generate(transcription: str = Form(...)) -> JSONResponse:
     return JSONResponse({"generated_response": generated, "reused": reused})
 
 
+@app.post("/generate-todo")
+async def generate_todo(transcription: str = Form(...)) -> JSONResponse:
+    """
+    Generate a To-Do text based on the provided transcription using GPT-4o-mini.
+    
+    Parameters
+    ----------
+    transcription : str
+        The input transcript for which a To-Do should be generated.
+        
+    Returns
+    -------
+    JSONResponse
+        JSON containing the generated To-Do text.
+    """
+    try:
+        # Use GPT-4o-mini to generate To-Do text
+        prompt = f"""Analiza esta conversación del atleta y genera un To-Do corto y específico 
+        para el entrenador. El To-Do debe ser:
+        - Accionable (qué debe hacer el entrenador)
+        - Específico (basado en lo que dice el atleta)
+        - Corto (máximo 20 palabras)
+        - Relevante para el entrenamiento
+        
+        Conversación del atleta: {transcription}
+        
+        Genera solo el texto del To-Do, sin explicaciones adicionales."""
+        
+        # Call OpenAI API
+        try:
+            import openai
+            client = openai.OpenAI()
+            
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un asistente especializado en generar To-Dos para entrenadores deportivos. Genera To-Dos cortos, específicos y accionables."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.3
+            )
+            
+            # Get the generated To-Do text
+            generated_todo = completion.choices[0].message.content.strip()
+            
+            return JSONResponse({
+                "success": True,
+                "generated_todo": generated_todo
+            })
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            # Fallback to simple To-Do
+            fallback_todo = f"Revisar conversación del atleta: {transcription[:50]}..."
+            return JSONResponse({
+                "success": True,
+                "generated_todo": fallback_todo
+            })
+            
+    except Exception as e:
+        logger.error(f"Error generating To-Do: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+
 @app.post("/save")
 async def save(
     athlete_id: int = Form(...),
@@ -707,9 +587,11 @@ async def save(
     JSONResponse
         JSON confirming that the record has been saved.
     """
-    timestamp = datetime.datetime.now().isoformat()
+    timestamp = datetime.now().isoformat()
+    
+    # Save the conversation record
     with conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO records (
                 athlete_id, timestamp, filename, transcription,
@@ -730,7 +612,30 @@ async def save(
                 source
             ),
         )
-    return JSONResponse({"status": "saved"})
+        conversation_id = cursor.lastrowid
+    
+    # Generate highlights from the conversation
+    try:
+        highlight_result = generate_highlights_from_conversation(
+            athlete_id=athlete_id,
+            conversation_id=conversation_id,
+            transcription=transcription,
+            response=final_response
+        )
+        
+        return JSONResponse({
+            "status": "saved",
+            "conversation_id": conversation_id,
+            "highlights_generated": highlight_result["count"] if highlight_result["status"] == "success" else 0
+        })
+    except Exception as e:
+        logger.error(f"Error generating highlights: {e}")
+        return JSONResponse({
+            "status": "saved",
+            "conversation_id": conversation_id,
+            "highlights_generated": 0,
+            "highlight_error": str(e)
+        })
 
 
 @app.get("/api/athletes", response_class=JSONResponse)
@@ -751,6 +656,49 @@ async def get_athletes() -> JSONResponse:
                 "sport": a[4],
                 "level": a[5],
                 "created_at": a[6]
+            }
+            for a in athletes
+        ]
+    })
+
+@app.get("/api/athletes/enhanced", response_class=JSONResponse)
+async def get_athletes_enhanced() -> JSONResponse:
+    """Get all athletes with enhanced data including last contact and todos count."""
+    with conn:
+        # Get athletes with last contact and todos count
+        cursor = conn.execute(
+            """
+            SELECT 
+                a.id, 
+                a.name, 
+                a.email, 
+                a.phone, 
+                a.sport, 
+                a.level, 
+                a.created_at,
+                MAX(r.timestamp) as last_contact,
+                COUNT(CASE WHEN ct.status IN ('backlog', 'doing') THEN 1 END) as open_todos
+            FROM athletes a
+            LEFT JOIN records r ON a.id = r.athlete_id
+            LEFT JOIN coach_todos ct ON a.id = ct.athlete_id
+            GROUP BY a.id, a.name, a.email, a.phone, a.sport, a.level, a.created_at
+            ORDER BY a.name
+            """
+        )
+        athletes = cursor.fetchall()
+    
+    return JSONResponse({
+        "athletes": [
+            {
+                "id": a[0],
+                "name": a[1],
+                "email": a[2],
+                "phone": a[3],
+                "sport": a[4],
+                "level": a[5],
+                "created_at": a[6],
+                "last_contact": a[7],
+                "open_todos": a[8] or 0
             }
             for a in athletes
         ]
@@ -813,13 +761,34 @@ async def get_athlete_history(athlete_id: int) -> JSONResponse:
 @app.get("/athletes", response_class=HTMLResponse)
 async def athletes(request: Request) -> HTMLResponse:
     """Serve the athletes management page."""
-    return templates.TemplateResponse("improved_athletes.html", {"request": request})
+    return templates.TemplateResponse("athletes.html", {"request": request})
 
 
-@app.get("/athletes/manage", response_class=HTMLResponse)
-async def manage_athletes(request: Request) -> HTMLResponse:
-    """Serve the athletes management page (legacy route)."""
-    return templates.TemplateResponse("improved_athletes.html", {"request": request})
+@app.get("/athletes/{athlete_id}/workspace", response_class=HTMLResponse)
+async def athlete_workspace(request: Request, athlete_id: int) -> HTMLResponse:
+    """Serve the athlete workspace page."""
+    # Get athlete data for the page
+    with conn:
+        cursor = conn.execute(
+            "SELECT id, name, email, phone, sport, level FROM athletes WHERE id = ?",
+            (athlete_id,)
+        )
+        athlete = cursor.fetchone()
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    return templates.TemplateResponse("athlete_workspace.html", {
+        "request": request,
+        "athlete_id": athlete_id,
+        "athlete_name": athlete[1] if athlete else "Atleta"
+    })
+
+
+@app.get("/coach/todos", response_class=HTMLResponse)
+async def coach_todo_board(request: Request) -> HTMLResponse:
+    """Serve the coach todo board page."""
+    return templates.TemplateResponse("coach_todo_board.html", {"request": request})
 
 
 @app.get("/api/athletes/{athlete_id}", response_class=JSONResponse)
@@ -900,497 +869,6 @@ async def delete_athlete(athlete_id: int) -> JSONResponse:
     except Exception as e:
         logger.error(f"Error deleting athlete: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-
-
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request) -> HTMLResponse:
-    """Serve the enhanced dashboard page."""
-    return templates.TemplateResponse("improved_dashboard.html", {"request": request})
-
-
-@app.get("/history", response_class=HTMLResponse)
-async def history(request: Request) -> HTMLResponse:
-    """
-    Display a simple table containing all past saved responses.
-
-    Returns
-    -------
-    HTMLResponse
-        The rendered history page with a table of records.
-    """
-    with conn:
-        cursor = conn.execute(
-            "SELECT id, timestamp, transcription, final_response, source FROM records ORDER BY id DESC"
-        )
-        rows = cursor.fetchall()
-    return templates.TemplateResponse(
-        "improved_history.html", {"request": request, "records": rows}
-    )
-
-
-@app.get("/athletes/{athlete_id}/history/view", response_class=HTMLResponse)
-async def view_athlete_history(request: Request, athlete_id: int) -> HTMLResponse:
-    """
-    Display history page filtered for a specific athlete.
-
-    Parameters
-    ----------
-    athlete_id : int
-        The ID of the athlete to show history for.
-
-    Returns
-    -------
-    HTMLResponse
-        The rendered history page with athlete-specific records.
-    """
-    # Get athlete details
-    with conn:
-        cursor = conn.execute(
-            "SELECT id, name, email, phone, sport, level, created_at FROM athletes WHERE id = ?",
-            (athlete_id,)
-        )
-        athlete = cursor.fetchone()
-        
-        if not athlete:
-            # If athlete not found, redirect to general history
-            cursor = conn.execute(
-                "SELECT id, timestamp, transcription, final_response, source FROM records ORDER BY id DESC"
-            )
-            rows = cursor.fetchall()
-            return templates.TemplateResponse(
-                "improved_history.html", {"request": request, "records": rows}
-            )
-        
-        # Get records for this specific athlete
-        cursor = conn.execute(
-            "SELECT id, timestamp, transcription, final_response, source FROM records WHERE athlete_id = ? ORDER BY id DESC",
-            (athlete_id,)
-        )
-        rows = cursor.fetchall()
-    
-    athlete_data = {
-        "id": athlete[0],
-        "name": athlete[1],
-        "email": athlete[2],
-        "phone": athlete[3],
-        "sport": athlete[4],
-        "level": athlete[5],
-        "created_at": athlete[6]
-    }
-    
-    return templates.TemplateResponse(
-        "improved_history.html", {
-            "request": request, 
-            "records": rows,
-            "athlete": athlete_data
-        }
-    )
-
-
-# WhatsApp and Telegram Integration Endpoints
-
-def extract_whatsapp_events(payload: dict) -> list[dict]:
-    """Extrae eventos de mensajes del payload de WhatsApp de Meta."""
-    events = []
-    for entry in payload.get("entry", []):
-        for change in entry.get("changes", []):
-            value = change.get("value", {})
-            for msg in value.get("messages", []):
-                phone = msg.get("from", "")
-                # obtener cuerpo según el tipo de mensaje
-                msg_type = msg.get("type")
-                if msg_type == "text":
-                    text = msg.get("text", {}).get("body", "")
-                elif msg_type == "image":
-                    text = "[Imagen recibida]"
-                elif msg_type == "audio":
-                    text = "[Audio recibido]"
-                elif msg_type == "document":
-                    text = "[Documento recibido]"
-                else:
-                    text = msg.get(msg_type, {}).get("body", "") if msg_type else ""
-                events.append({"phone": phone, "text": text, "id": msg.get("id")})
-    return events
-
-async def send_whatsapp_message(phone: str, message: str) -> dict:
-    """Envía un mensaje por WhatsApp usando Twilio o Meta API."""
-    
-    # Try Twilio first (if configured)
-    twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    twilio_whatsapp_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
-    
-    if twilio_account_sid and twilio_auth_token and twilio_whatsapp_number:
-        return await send_whatsapp_via_twilio(phone, message)
-    
-    # Fallback to Meta API
-    phone_id = os.getenv("WHATSAPP_PHONE_ID")
-    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
-    
-    if not phone_id or not access_token:
-        logger.warning("No se configuraron credenciales de WhatsApp (Twilio o Meta); mensaje no enviado")
-        return {"status": "skipped", "message": "WhatsApp credentials not configured"}
-    
-    return await send_whatsapp_via_meta(phone, message)
-
-
-async def send_whatsapp_via_twilio(phone: str, message: str) -> dict:
-    """Envía un mensaje por WhatsApp usando Twilio API directamente."""
-    try:
-        import httpx
-        
-        account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-        auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-        from_number = os.getenv("TWILIO_WHATSAPP_NUMBER")
-        
-        if not account_sid or not auth_token or not from_number:
-            return {"status": "error", "message": "Twilio credentials not configured"}
-        
-        # Ensure phone number has whatsapp: prefix
-        to_number = phone if phone.startswith("whatsapp:") else f"whatsapp:{phone}"
-        from_number = from_number if from_number.startswith("whatsapp:") else f"whatsapp:{from_number}"
-        
-        # Twilio API endpoint
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
-        
-        # Request payload
-        payload = {
-            "Body": message,
-            "From": from_number,
-            "To": to_number
-        }
-        
-        # Basic auth with account SID and auth token
-        auth = (account_sid, auth_token)
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, data=payload, auth=auth)
-            
-            if response.status_code == 201:
-                data = response.json()
-                logger.info(f"Twilio WhatsApp message sent: {data.get('sid')}")
-                return {"status": "sent", "data": {"sid": data.get('sid')}}
-            else:
-                logger.error(f"Twilio API error: {response.status_code} - {response.text}")
-                return {"status": "error", "message": f"Twilio API error: {response.status_code}"}
-        
-    except Exception as e:
-        logger.error(f"Error sending Twilio WhatsApp message: {e}")
-        return {"status": "error", "message": str(e)}
-
-
-async def send_whatsapp_via_meta(phone: str, message: str) -> dict:
-    """Envía un mensaje por WhatsApp usando la API de Meta."""
-    phone_id = os.getenv("WHATSAPP_PHONE_ID")
-    access_token = os.getenv("WHATSAPP_ACCESS_TOKEN")
-    
-    if not phone_id or not access_token:
-        return {"status": "skipped", "message": "Meta WhatsApp credentials not configured"}
-    
-    url = f"https://graph.facebook.com/v19.0/{phone_id}/messages"
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": phone,
-        "type": "text",
-        "text": {"body": message}
-    }
-    headers = {
-        "Authorization": f"Bearer {access_token}", 
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        import httpx
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code == 200:
-                return {"status": "sent", "data": resp.json()}
-            else:
-                logger.error(f"Meta WhatsApp API error: {resp.status_code} - {resp.text}")
-                return {"status": "error", "data": resp.json()}
-    except Exception as e:
-        logger.error(f"Error sending Meta WhatsApp message: {e}")
-        return {"status": "error", "message": str(e)}
-
-async def process_incoming_message(phone: str, message: str, source: str, external_id: str = None) -> dict:
-    """
-    Process an incoming message using the new workflow system.
-    
-    Parameters
-    ----------
-    phone : str
-        Phone number of the sender
-    message : str
-        The message content
-    source : str
-        Source of the message ('whatsapp' or 'telegram')
-    external_id : str, optional
-        External message ID for tracking
-        
-    Returns
-    -------
-    dict
-        Processing result with status and response
-    """
-    # Find athlete by phone number
-    athlete = find_athlete_by_phone(phone)
-    if not athlete:
-        return {
-            "status": "error",
-            "message": f"No athlete found for phone number {phone}",
-            "response": None
-        }
-    
-    try:
-        # Create message event for workflow
-        event = MessageEvent(
-            source_channel=source,
-            source_message_id=external_id or f"{source}_{datetime.datetime.now().timestamp()}",
-            athlete_id=athlete["id"],
-            content_text=message
-        )
-        
-        # Configure default actions
-        actions = WorkflowActions(
-            save_to_history=True,
-            generate_highlights=True,  # Auto-generate highlights
-            suggest_reply=True,        # Auto-suggest reply
-            maybe_todo=True            # Auto-detect todos
-        )
-        
-        # Process through workflow
-        result = await workflow_service.process_incoming_message(event, actions)
-        
-        # Generate AI response for backward compatibility
-        ai_response = await generate_ai_response(message)
-        
-        return {
-            "status": "success",
-            "message": f"Message processed for athlete {athlete['name']}",
-            "athlete": athlete,
-            "response": ai_response,
-            "workflow_result": result
-        }
-    
-    except Exception as e:
-        return {
-            "status": "error", 
-            "message": f"Error processing message: {str(e)}",
-            "response": None
-        }
-
-
-@app.post("/webhook/whatsapp")
-async def whatsapp_webhook(request: Request) -> JSONResponse:
-    """
-    WhatsApp webhook endpoint for receiving messages.
-    
-    Supports both Meta API and Twilio formats.
-    
-    Returns
-    -------
-    JSONResponse
-        Response status and any reply message
-    """
-    try:
-        payload = await request.json()
-        logger.info(f"WhatsApp webhook received: {payload}")
-        
-        # Meta API format
-        if "entry" in payload:
-            events = extract_whatsapp_events(payload)
-            for ev in events:
-                if ev["phone"] and ev["text"]:
-                    result = await process_incoming_message(
-                        phone=ev["phone"],
-                        message=ev["text"],
-                        source="whatsapp",
-                        external_id=ev["id"]
-                    )
-                    if result["status"] == "success":
-                        # Send automatic response if configured
-                        if result.get("response"):
-                            await send_whatsapp_message(ev["phone"], result["response"])
-                        return JSONResponse({
-                            "status": "processed",
-                            "athlete": result["athlete"]["name"],
-                            "response": result["response"]
-                        })
-                    else:
-                        return JSONResponse({"status": "error", "message": result["message"]}, status_code=400)
-        
-        # Twilio format (legacy)
-        elif "messages" in payload:
-            for message_data in payload["messages"]:
-                phone = message_data.get("from", "").replace("whatsapp:", "")
-                message_text = message_data.get("text", {}).get("body", "")
-                message_id = message_data.get("id", "")
-                
-                if phone and message_text:
-                    result = await process_incoming_message(
-                        phone=phone, 
-                        message=message_text, 
-                        source="whatsapp", 
-                        external_id=message_id
-                    )
-                    if result["status"] == "success":
-                        # Send automatic response if configured
-                        if result.get("response"):
-                            await send_whatsapp_message(phone, result["response"])
-                        return JSONResponse({
-                            "status": "processed", 
-                            "athlete": result["athlete"]["name"], 
-                            "response": result["response"]
-                        })
-                    else:
-                        return JSONResponse({"status": "error", "message": result["message"]}, status_code=400)
-        
-        return JSONResponse({"status": "no_message_found"})
-        
-    except Exception as e:
-        logger.error(f"Error processing WhatsApp webhook: {e}")
-        return JSONResponse({
-            "status": "error",
-            "message": f"Webhook processing error: {str(e)}"
-        }, status_code=500)
-
-
-@app.get("/webhook/whatsapp")
-async def whatsapp_webhook_verify(request: Request) -> JSONResponse:
-    """WhatsApp webhook verification endpoint."""
-    try:
-        # Handle webhook verification
-        challenge = request.query_params.get("hub.challenge")
-        verify_token = request.query_params.get("hub.verify_token")
-        
-        # You should verify the token matches your configured webhook token
-        expected_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "your_verify_token")
-        
-        if verify_token == expected_token and challenge:
-            return JSONResponse({"hub.challenge": challenge})
-        else:
-            return JSONResponse({"error": "Invalid verification"}, status_code=403)
-            
-    except Exception as e:
-        return JSONResponse({
-            "status": "error",
-            "message": f"Verification error: {str(e)}"
-        }, status_code=500)
-
-
-@app.post("/webhook/telegram")
-async def telegram_webhook(request: Request) -> JSONResponse:
-    """
-    Telegram webhook endpoint for receiving messages.
-    
-    This endpoint should be configured with Telegram Bot API using setWebhook.
-    
-    Returns
-    -------
-    JSONResponse
-        Response status and any reply message
-    """
-    try:
-        payload = await request.json()
-        
-        # Extract message data from Telegram webhook payload
-        if "message" in payload:
-            message_data = payload["message"]
-            
-            # Extract phone number from user contact info if available
-            # Note: Telegram doesn't always provide phone numbers
-            phone = None
-            message_text = message_data.get("text", "")
-            message_id = message_data.get("message_id", "")
-            user_data = message_data.get("from", {})
-            
-            # Try to get phone from contact info
-            if "contact" in message_data:
-                phone = message_data["contact"].get("phone_number", "")
-            
-            # If no phone in contact, try to match by Telegram username or ID
-            # This requires you to manually map Telegram users to athletes
-            telegram_id = user_data.get("id", "")
-            telegram_username = user_data.get("username", "")
-            
-            if not phone:
-                # You could implement a mapping table for Telegram users to athletes
-                # For now, we'll include this info in the error message
-                return JSONResponse({
-                    "status": "error",
-                    "message": f"No phone number available for Telegram user {telegram_username} (ID: {telegram_id})",
-                    "suggestion": "User needs to share contact or manually map Telegram ID to athlete"
-                }, status_code=400)
-            
-            if phone and message_text:
-                result = await process_incoming_message(
-                    phone=phone,
-                    message=message_text,
-                    source="telegram",
-                    external_id=str(message_id)
-                )
-                
-                if result["status"] == "success":
-                    return JSONResponse({
-                        "status": "processed",
-                        "athlete": result["athlete"]["name"],
-                        "response": result["response"]
-                    })
-                else:
-                    return JSONResponse({
-                        "status": "error",
-                        "message": result["message"]
-                    }, status_code=400)
-        
-        return JSONResponse({"status": "no_message_found"})
-        
-    except Exception as e:
-        return JSONResponse({
-            "status": "error",
-            "message": f"Telegram webhook processing error: {str(e)}"
-        }, status_code=500)
-
-
-@app.post("/test/webhook")
-async def test_webhook(request: Request) -> JSONResponse:
-    """
-    Test endpoint for webhook functionality.
-    
-    Use this to test the phone number matching and message processing.
-    
-    Expected JSON payload:
-    {
-        "phone": "+1234567890",
-        "message": "Test message",
-        "source": "test"
-    }
-    """
-    try:
-        payload = await request.json()
-        phone = payload.get("phone", "")
-        message = payload.get("message", "")
-        source = payload.get("source", "test")
-        
-        if not phone or not message:
-            return JSONResponse({
-                "status": "error",
-                "message": "Phone and message are required"
-            }, status_code=400)
-        
-        result = await process_incoming_message(
-            phone=phone,
-            message=message,
-            source=source,
-            external_id="test_" + datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        )
-        
-        return JSONResponse(result)
-        
-    except Exception as e:
-        return JSONResponse({
-            "status": "error",
-            "message": f"Test webhook error: {str(e)}"
-        }, status_code=500)
 
 
 @app.get("/test/whatsapp-config")
@@ -1479,7 +957,7 @@ async def system_status() -> JSONResponse:
             "communication_hub": "enabled",
             "athlete_management": "enabled",
             "message_storage": "enabled",
-            "whatsapp_sending": "enabled" if whatsapp_configured else "disabled",
+            "whatsapp_sending": "enabled if whatsapp_configured else disabled",
             "email_sending": "planned",
             "sms_sending": "planned"
         },
@@ -1710,7 +1188,7 @@ def generate_highlights_from_conversation(
     response: str
 ) -> dict:
     """
-    Generate highlights from a conversation using AI.
+    Generate highlights from a conversation using GPT-4o-mini.
     
     Parameters
     ----------
@@ -1732,34 +1210,71 @@ def generate_highlights_from_conversation(
         # Combine transcription and response for context
         full_context = f"Athlete: {transcription}\nCoach: {response}"
         
-        # Use AI to extract key points
-        prompt = f"""Extract the 2-3 most important key points from this conversation between an athlete and coach. 
-        Focus on actionable insights, important decisions, or significant updates.
+        # Use GPT-4o-mini to extract key points
+        prompt = f"""Analiza esta conversación entre un atleta y su entrenador. 
+        Genera 1-2 statements cortos y super resumidos (máximo 15 palabras cada uno) 
+        que capturen lo más importante y relevante para el entrenamiento.
         
-        Conversation:
+        Enfócate en:
+        - Progreso del atleta
+        - Problemas o dificultades mencionadas
+        - Decisiones importantes sobre entrenamiento
+        - Logros o mejoras
+        - Aspectos que requieren atención
+        
+        Conversación:
         {full_context}
         
-        Return only the key points as a JSON array of strings, like:
-        ["Key point 1", "Key point 2", "Key point 3"]"""
+        Devuelve solo los statements como un array JSON de strings, ejemplo:
+        ["Atleta reporta buen progreso en entrenamientos de monte", "Necesita mejorar técnica en subidas"]
         
-        # For now, return a simple implementation
-        # In production, this would use the OpenAI API
-        highlights = [
-            f"Conversation about: {transcription[:50]}...",
-            f"Coach response focused on: {response[:50]}..."
-        ]
+        Si la conversación no contiene información relevante para el entrenamiento, devuelve un array vacío []."""
+        
+        # Call OpenAI API
+        try:
+            import openai
+            client = openai.OpenAI()
+            
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "Eres un asistente especializado en análisis de conversaciones deportivas. Genera resúmenes cortos y precisos."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.3
+            )
+            
+            # Parse the response
+            ai_response = completion.choices[0].message.content.strip()
+            
+            # Try to parse as JSON
+            try:
+                import json
+                highlights = json.loads(ai_response)
+                if not isinstance(highlights, list):
+                    highlights = []
+            except:
+                # If JSON parsing fails, create a simple highlight
+                highlights = [f"Conversación relevante: {transcription[:50]}..."]
+                
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            # Fallback to simple highlight
+            highlights = [f"Conversación relevante: {transcription[:50]}..."]
         
         # Add highlights to database
         added_highlights = []
         for highlight in highlights:
-            result = add_athlete_highlight(
-                athlete_id=athlete_id,
-                highlight_text=highlight,
-                category="auto-generated",
-                source_conversation_id=conversation_id
-            )
-            if result["status"] == "success":
-                added_highlights.append(result["highlight_id"])
+            if highlight and len(highlight.strip()) > 0:
+                result = add_athlete_highlight(
+                    athlete_id=athlete_id,
+                    highlight_text=highlight.strip(),
+                    category="auto-generated",
+                    source_conversation_id=conversation_id
+                )
+                if result["status"] == "success":
+                    added_highlights.append(result["highlight_id"])
         
         return {
             "status": "success",
@@ -1767,6 +1282,7 @@ def generate_highlights_from_conversation(
             "count": len(added_highlights)
         }
     except Exception as e:
+        logger.error(f"Error generating highlights: {e}")
         return {
             "status": "error",
             "message": f"Error generating highlights: {str(e)}"
@@ -1776,186 +1292,1761 @@ def generate_highlights_from_conversation(
 # API endpoints for athlete highlights
 
 @app.post("/api/athletes/{athlete_id}/highlights", response_class=JSONResponse)
-async def create_highlight(
+async def create_athlete_highlight_enhanced(
     athlete_id: int,
     highlight_text: str = Form(...),
+    categories: Optional[str] = Form(""),  # JSON array or CSV
     category: str = Form("general"),
     source_conversation_id: Optional[int] = Form(None)
 ) -> JSONResponse:
-    """
-    Create a new highlight for an athlete.
-    
-    Parameters
-    ----------
-    athlete_id : int
-        ID of the athlete
-    highlight_text : str
-        The key point or summary to highlight
-    category : str
-        Category of the highlight
-    source_conversation_id : int, optional
-        ID of the conversation this highlight was derived from
-        
-    Returns
-    -------
-    JSONResponse
-        Result with status and highlight ID
-    """
-    result = add_athlete_highlight(
-        athlete_id=athlete_id,
-        highlight_text=highlight_text,
-        category=category,
-        source_conversation_id=source_conversation_id
-    )
-    return JSONResponse(result)
-
-
-@app.get("/api/athletes/{athlete_id}/highlights", response_class=JSONResponse)
-async def get_highlights(
-    athlete_id: int,
-    active_only: bool = True,
-    manual_only: bool = False
-) -> JSONResponse:
-    """
-    Get all highlights for an athlete.
-    
-    Parameters
-    ----------
-    athlete_id : int
-        ID of the athlete
-    active_only : bool
-        Whether to return only active highlights
-    manual_only : bool
-        Whether to return only manual highlights (not AI-generated)
-        
-    Returns
-    -------
-    JSONResponse
-        List of highlights for the athlete
-    """
-    highlights = get_athlete_highlights(athlete_id, active_only)
-    
-    if manual_only:
-        # Filter to only manual highlights (those without source_conversation_id)
-        highlights = [h for h in highlights if not h.get('source_conversation_id')]
-    
-    return JSONResponse({"highlights": highlights})
-
-
-@app.put("/highlights/{highlight_id}", response_class=JSONResponse)
-async def update_highlight(
-    highlight_id: int,
-    is_active: bool = Form(...)
-) -> JSONResponse:
-    """
-    Update the active status of a highlight.
-    
-    Parameters
-    ----------
-    highlight_id : int
-        ID of the highlight to update
-    is_active : bool
-        Whether the highlight should be active
-        
-    Returns
-    -------
-    JSONResponse
-        Result with status
-    """
-    result = update_highlight_status(highlight_id, is_active)
-    return JSONResponse(result)
-
-
-@app.put("/highlights/{highlight_id}/content", response_class=JSONResponse)
-async def update_highlight_content(
-    highlight_id: int,
-    highlight_text: str = Form(...),
-    category: str = Form(...)
-) -> JSONResponse:
-    """
-    Update the content of a highlight.
-    
-    Parameters
-    ----------
-    highlight_id : int
-        ID of the highlight to update
-    highlight_text : str
-        The new highlight text
-    category : str
-        The new category
-        
-    Returns
-    -------
-    JSONResponse
-        Result with status
-    """
+    """Create a new highlight for an athlete"""
     try:
-        with conn:
-            cursor = conn.execute("""
-                UPDATE athlete_highlights 
-                SET highlight_text = ?, category = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            """, (highlight_text, category, highlight_id))
-            
-            if cursor.rowcount > 0:
-                return JSONResponse({"status": "success", "message": "Highlight updated successfully"})
-            else:
-                return JSONResponse({"status": "error", "message": "Highlight not found"}, status_code=404)
-                
-    except Exception as e:
-        logger.error(f"Error updating highlight content: {e}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
-
-
-@app.delete("/highlights/{highlight_id}", response_class=JSONResponse)
-async def delete_highlight_endpoint(highlight_id: int) -> JSONResponse:
-    """
-    Delete a highlight.
-    
-    Parameters
-    ----------
-    highlight_id : int
-        ID of the highlight to delete
+        cursor = conn.cursor()
         
-    Returns
-    -------
-    JSONResponse
-        Result with status
-    """
-    result = delete_highlight(highlight_id)
-    return JSONResponse(result)
+        # Validate athlete exists
+        cursor.execute("SELECT id FROM athletes WHERE id = ?", (athlete_id,))
+        if not cursor.fetchone():
+            return JSONResponse({
+                "success": False,
+                "error": "Athlete not found"
+            }, status_code=404)
+        
+        # Process categories
+        categories_json = "[]"
+        if categories:
+            try:
+                # If it's already JSON, validate it
+                if categories.startswith('['):
+                    json.loads(categories)
+                    categories_json = categories
+                else:
+                    # Convert CSV to JSON array
+                    cats = [c.strip() for c in categories.split(',') if c.strip()]
+                    categories_json = json.dumps(cats)
+            except:
+                categories_json = "[]"
+        
+        cursor.execute("""
+            INSERT INTO athlete_highlights (
+                athlete_id, highlight_text, category, categories, 
+                source_conversation_id, is_manual, is_active
+            ) VALUES (?, ?, ?, ?, ?, 1, 1)
+        """, (athlete_id, highlight_text, category, categories_json, source_conversation_id))
+        
+        highlight_id = cursor.lastrowid
+        conn.commit()
+        
+        # Get the created highlight
+        cursor.execute("""
+            SELECT h.*, a.name as athlete_name
+            FROM athlete_highlights h
+            LEFT JOIN athletes a ON h.athlete_id = a.id
+            WHERE h.id = ?
+        """, (highlight_id,))
+        
+        row = cursor.fetchone()
+        if row:
+            # Parse categories
+            categories_str = row[4] if row[4] else "[]"
+            try:
+                categories_list = json.loads(categories_str)
+            except:
+                categories_list = []
+            
+            highlight = {
+                "id": row[0],
+                "athlete_id": row[1],
+                "highlight_text": row[2],
+                "category": row[3],
+                "categories": categories_list,
+                "score": row[5],
+                "source": row[6],
+                "status": row[7],
+                "reviewed_by": row[8],
+                "is_manual": bool(row[9]),
+                "is_active": bool(row[10]),
+                "created_at": row[11],
+                "updated_at": row[12],
+                "athlete_name": row[13],
+                "source_conversation_id": row[14] if len(row) > 14 else None
+            }
+            
+            return JSONResponse({
+                "success": True,
+                "highlight": highlight
+            })
+        
+        return JSONResponse({
+            "success": False,
+            "error": "Failed to create highlight"
+        }, status_code=500)
+        
+    except Exception as e:
+        logger.error(f"Error creating athlete highlight: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
 
+@app.put("/api/highlights/{highlight_id}", response_class=JSONResponse)
+async def update_highlight_enhanced(
+    highlight_id: int,
+    highlight_text: Optional[str] = Form(None),
+    categories: Optional[str] = Form(None),
+    category: Optional[str] = Form(None),
+    is_active: Optional[bool] = Form(None)
+) -> JSONResponse:
+    """Update a highlight"""
+    try:
+        cursor = conn.cursor()
+        
+        # Get current highlight
+        cursor.execute("SELECT * FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        current = cursor.fetchone()
+        
+        if not current:
+            return JSONResponse({
+                "success": False,
+                "error": "Highlight not found"
+            }, status_code=404)
+        
+        # Build update query
+        update_fields = []
+        params = []
+        
+        if highlight_text is not None:
+            update_fields.append("highlight_text = ?")
+            params.append(highlight_text)
+            
+        if categories is not None:
+            # Process categories
+            try:
+                if categories.startswith('['):
+                    json.loads(categories)  # Validate JSON
+                    categories_json = categories
+                else:
+                    cats = [c.strip() for c in categories.split(',') if c.strip()]
+                    categories_json = json.dumps(cats)
+            except:
+                categories_json = "[]"
+            
+            update_fields.append("categories = ?")
+            params.append(categories_json)
+            
+        if category is not None:
+            update_fields.append("category = ?")
+            params.append(category)
+            
+        if is_active is not None:
+            update_fields.append("is_active = ?")
+            params.append(1 if is_active else 0)
+        
+        if not update_fields:
+            return JSONResponse({
+                "success": False,
+                "error": "No fields to update"
+            }, status_code=400)
+        
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(highlight_id)
+        
+        query = f"UPDATE athlete_highlights SET {', '.join(update_fields)} WHERE id = ?"
+        cursor.execute(query, params)
+        conn.commit()
+        
+        # Get updated highlight
+        cursor.execute("""
+            SELECT h.*, a.name as athlete_name
+            FROM athlete_highlights h
+            LEFT JOIN athletes a ON h.athlete_id = a.id
+            WHERE h.id = ?
+        """, (highlight_id,))
+        
+        row = cursor.fetchone()
+        if row:
+            # Parse categories
+            categories_str = row[4] if row[4] else "[]"
+            try:
+                categories_list = json.loads(categories_str)
+            except:
+                categories_list = []
+            
+            highlight = {
+                "id": row[0],
+                "athlete_id": row[1],
+                "highlight_text": row[2],
+                "category": row[3],
+                "categories": categories_list,
+                "score": row[5],
+                "source": row[6],
+                "status": row[7],
+                "reviewed_by": row[8],
+                "is_manual": bool(row[9]),
+                "is_active": bool(row[10]),
+                "created_at": row[11],
+                "updated_at": row[12],
+                "athlete_name": row[13],
+                "source_conversation_id": row[14] if len(row) > 14 else None
+            }
+            
+            return JSONResponse({
+                "success": True,
+                "highlight": highlight
+            })
+        
+        return JSONResponse({
+            "success": False,
+            "error": "Failed to update highlight"
+        }, status_code=500)
+        
+    except Exception as e:
+        logger.error(f"Error updating highlight: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.delete("/api/highlights/{highlight_id}", response_class=JSONResponse)
+async def delete_highlight_enhanced(highlight_id: int) -> JSONResponse:
+    """Delete a highlight"""
+    try:
+        cursor = conn.cursor()
+        
+        # Check if highlight exists
+        cursor.execute("SELECT id FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        if not cursor.fetchone():
+            return JSONResponse({
+                "success": False,
+                "error": "Highlight not found"
+            }, status_code=404)
+        
+        cursor.execute("DELETE FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        conn.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Highlight deleted successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting highlight: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
 
 @app.post("/api/athletes/{athlete_id}/highlights/generate", response_class=JSONResponse)
-async def generate_highlights(
+async def generate_highlights_enhanced(
     athlete_id: int,
-    conversation_id: int = Form(...),
-    transcription: str = Form(...),
-    response: str = Form(...)
+    conversation_id: Optional[int] = Form(None),
+    transcription: Optional[str] = Form(""),
+    response: Optional[str] = Form("")
 ) -> JSONResponse:
-    """
-    Generate highlights from a conversation using AI.
+    """Generate highlights from conversation using GPT-4o-mini"""
     
-    Parameters
-    ----------
-    athlete_id : int
-        ID of the athlete
-    conversation_id : int
-        ID of the conversation
-    transcription : str
-        The athlete's message
-    response : str
-        The coach's response
+    # Check if automatic GPT is enabled
+    if not AUTO_GPT_ENABLED:
+        return JSONResponse({
+            "success": True,
+            "highlights": [],
+            "count": 0,
+            "message": "Automatic GPT highlights generation is disabled"
+        })
+    
+    try:
+        # Get athlete info for context
+        conn = sqlite3.connect('database.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, sport, level FROM athletes WHERE id = ?", (athlete_id,))
+        athlete = cursor.fetchone()
+        conn.close()
         
-    Returns
-    -------
-    JSONResponse
-        Result with generated highlights
+        if not athlete:
+            return JSONResponse({
+                "success": False,
+                "error": "Athlete not found"
+            }, status_code=404)
+        
+        athlete_name, sport, level = athlete
+        
+        # Prepare context for GPT
+        context = f"""
+        Atleta: {athlete_name} ({sport}, nivel {level})
+        Mensaje: {transcription}
+        Respuesta: {response}
+        """
+        
+        prompt = f"""
+        Analiza esta conversación entre un entrenador y su atleta.
+        
+        {context}
+        
+        Genera 2-3 highlights relevantes que capturen:
+        - Progreso del atleta
+        - Problemas o preocupaciones
+        - Objetivos o planes
+        - Aspectos técnicos importantes
+        - Factores de riesgo (lesiones, fatiga, etc.)
+        
+        Responde solo con un array JSON de strings, por ejemplo:
+        ["Highlight 1", "Highlight 2", "Highlight 3"]
+        """
+        
+        try:
+            response_ai = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=300
+            )
+            
+            highlights_text = response_ai.choices[0].message.content.strip()
+            
+            # Try to parse as JSON array
+            try:
+                highlights = json.loads(highlights_text)
+                if not isinstance(highlights, list):
+                    highlights = [highlights_text]
+            except:
+                # If not valid JSON, split by lines or commas
+                highlights = [h.strip() for h in highlights_text.replace('\n', ',').split(',') if h.strip()]
+            
+            # Create highlights in database
+            created_highlights = []
+            for highlight_text in highlights[:3]:  # Limit to 3 highlights
+                cursor.execute("""
+                    INSERT INTO athlete_highlights (
+                        athlete_id, highlight_text, category, categories,
+                        source_conversation_id, is_manual, is_active, source
+                    ) VALUES (?, ?, ?, ?, ?, 0, 1, 'ai')
+                """, (athlete_id, highlight_text, "general", "[]", conversation_id))
+                
+                highlight_id = cursor.lastrowid
+                created_highlights.append({
+                    "id": highlight_id,
+                    "text": highlight_text,
+                    "category": "general",
+                    "categories": [],
+                    "source": "ai"
+                })
+            
+            conn.commit()
+            
+            return JSONResponse({
+                "success": True,
+                "highlights": created_highlights,
+                "count": len(created_highlights)
+            })
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            return JSONResponse({
+                "success": False,
+                "error": f"Error generating highlights: {str(api_error)}"
+            }, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error generating highlights: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+# Add routes for the new HTML interfaces
+@app.get("/athletes/{athlete_id}/workspace", response_class=HTMLResponse)
+async def athlete_workspace(request: Request, athlete_id: int) -> HTMLResponse:
+    """Serve the athlete workspace page."""
+    # Get athlete data for the page
+    with conn:
+        cursor = conn.execute(
+            "SELECT id, name, email, phone, sport, level FROM athletes WHERE id = ?",
+            (athlete_id,)
+        )
+        athlete = cursor.fetchone()
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    return templates.TemplateResponse("athlete_workspace.html", {
+        "request": request,
+        "athlete_id": athlete_id,
+        "athlete_name": athlete[1] if athlete else "Atleta"
+    })
+
+@app.get("/coach/todos", response_class=HTMLResponse)
+async def coach_todo_board(request: Request) -> HTMLResponse:
+    """Serve the coach todo board page."""
+    return templates.TemplateResponse("coach_todo_board.html", {"request": request})
+
+# Add migration for athlete_highlights table
+def migrate_athlete_highlights():
+    """Add missing columns to athlete_highlights if they don't exist"""
+    cursor = conn.cursor()
+    
+    # Check if categories column exists
+    cursor.execute("PRAGMA table_info(athlete_highlights)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    # Add missing columns
+    missing_columns = []
+    
+    if 'categories' not in columns:
+        missing_columns.append("categories TEXT DEFAULT '[]'")
+    
+    if 'source_conversation_id' not in columns:
+        missing_columns.append("source_conversation_id INTEGER")
+    
+    if 'is_manual' not in columns:
+        missing_columns.append("is_manual BOOLEAN DEFAULT 0")
+    
+    if 'is_active' not in columns:
+        missing_columns.append("is_active BOOLEAN DEFAULT 1")
+    
+    if 'score' not in columns:
+        missing_columns.append("score REAL DEFAULT 0.0")
+    
+    if 'source' not in columns:
+        missing_columns.append("source TEXT DEFAULT 'manual'")
+    
+    if 'status' not in columns:
+        missing_columns.append("status TEXT DEFAULT 'accepted'")
+    
+    if 'reviewed_by' not in columns:
+        missing_columns.append("reviewed_by TEXT")
+    
+    # Add missing columns
+    for column_def in missing_columns:
+        try:
+            column_name = column_def.split()[0]
+            cursor.execute(f"ALTER TABLE athlete_highlights ADD COLUMN {column_def}")
+            logger.info(f"✅ Added {column_name} column to athlete_highlights table")
+        except Exception as e:
+            logger.error(f"Error adding {column_def}: {e}")
+    
+    conn.commit()
+
+# Run migration
+migrate_athlete_highlights()
+
+# Coach Todos endpoints (global todo management)
+@app.get("/api/todos", response_class=JSONResponse)
+async def get_coach_todos(
+    athlete_id: Optional[int] = Query(None, description="Filter by athlete ID"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    priority: Optional[str] = Query(None, description="Filter by priority"),
+    q: Optional[str] = Query("", description="Search query"),
+    due_from: Optional[str] = Query(None, description="Due date from (YYYY-MM-DD)"),
+    due_to: Optional[str] = Query(None, description="Due date to (YYYY-MM-DD)")
+) -> JSONResponse:
+    """Get all coach todos with optional filtering"""
+    try:
+        cursor = conn.cursor()
+        
+        # Build query with filters
+        query = """
+            SELECT ct.*, a.name as athlete_name 
+            FROM coach_todos ct 
+            LEFT JOIN athletes a ON ct.athlete_id = a.id 
+            WHERE 1=1
+        """
+        params = []
+        
+        if athlete_id is not None:
+            query += " AND ct.athlete_id = ?"
+            params.append(athlete_id)
+            
+        if status:
+            query += " AND ct.status = ?"
+            params.append(status)
+            
+        if priority:
+            query += " AND ct.priority = ?"
+            params.append(priority)
+            
+        if q:
+            query += " AND (ct.text LIKE ? OR a.name LIKE ?)"
+            search_term = f"%{q}%"
+            params.extend([search_term, search_term])
+            
+        if due_from:
+            query += " AND ct.due_date >= ?"
+            params.append(due_from)
+            
+        if due_to:
+            query += " AND ct.due_date <= ?"
+            params.append(due_to)
+            
+        query += " ORDER BY ct.created_at DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        todos = []
+        for row in rows:
+            todos.append({
+                "id": row[0],
+                "athlete_id": row[1],
+                "text": row[2],
+                "priority": row[3],
+                "status": row[4],
+                "due_date": row[5],
+                "created_by": row[6],
+                "source_record_id": row[7],
+                "created_at": row[8],
+                "updated_at": row[9],
+                "athlete_name": row[10]
+            })
+            
+        return JSONResponse({
+            "success": True,
+            "todos": todos,
+            "count": len(todos)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting coach todos: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.post("/api/todos", response_class=JSONResponse)
+async def create_coach_todo(
+    athlete_id: Optional[int] = Form(None),
+    text: str = Form(...),
+    priority: str = Form("P2"),
+    due: Optional[str] = Form(None),
+    status: str = Form("backlog"),
+    created_by: str = Form("coach"),
+    source_record_id: Optional[int] = Form(None)
+) -> JSONResponse:
+    """Create a new coach todo"""
+    try:
+        cursor = conn.cursor()
+        
+        # Validate priority
+        if priority not in ['P1', 'P2', 'P3']:
+            return JSONResponse({
+                "success": False,
+                "error": "Invalid priority. Must be P1, P2, or P3"
+            }, status_code=400)
+            
+        # Validate status
+        if status not in ['backlog', 'doing', 'done']:
+            return JSONResponse({
+                "success": False,
+                "error": "Invalid status. Must be backlog, doing, or done"
+            }, status_code=400)
+            
+        # Validate created_by
+        if created_by not in ['athlete', 'coach']:
+            return JSONResponse({
+                "success": False,
+                "error": "Invalid created_by. Must be athlete or coach"
+            }, status_code=400)
+        
+        cursor.execute("""
+            INSERT INTO coach_todos (athlete_id, text, priority, status, due_date, created_by, source_record_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (athlete_id, text, priority, status, due, created_by, source_record_id))
+        
+        todo_id = cursor.lastrowid
+        conn.commit()
+        
+        # Get the created todo with athlete name
+        cursor.execute("""
+            SELECT ct.*, a.name as athlete_name 
+            FROM coach_todos ct 
+            LEFT JOIN athletes a ON ct.athlete_id = a.id 
+            WHERE ct.id = ?
+        """, (todo_id,))
+        
+        row = cursor.fetchone()
+        if row:
+            todo = {
+                "id": row[0],
+                "athlete_id": row[1],
+                "text": row[2],
+                "priority": row[3],
+                "status": row[4],
+                "due_date": row[5],
+                "created_by": row[6],
+                "source_record_id": row[7],
+                "created_at": row[8],
+                "updated_at": row[9],
+                "athlete_name": row[10]
+            }
+            
+            return JSONResponse({
+                "success": True,
+                "todo": todo
+            })
+        
+        return JSONResponse({
+            "success": False,
+            "error": "Failed to create todo"
+        }, status_code=500)
+        
+    except Exception as e:
+        logger.error(f"Error creating coach todo: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.put("/api/todos/{todo_id}", response_class=JSONResponse)
+async def update_coach_todo(
+    todo_id: int,
+    text: Optional[str] = Form(None),
+    priority: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
+    due: Optional[str] = Form(None),
+    athlete_id: Optional[int] = Form(None)
+) -> JSONResponse:
+    """Update a coach todo"""
+    try:
+        cursor = conn.cursor()
+        
+        # Get current todo
+        cursor.execute("SELECT * FROM coach_todos WHERE id = ?", (todo_id,))
+        current = cursor.fetchone()
+        
+        if not current:
+            return JSONResponse({
+                "success": False,
+                "error": "Todo not found"
+            }, status_code=404)
+        
+        # Build update query with only provided fields
+        update_fields = []
+        params = []
+        
+        if text is not None:
+            update_fields.append("text = ?")
+            params.append(text)
+            
+        if priority is not None:
+            if priority not in ['P1', 'P2', 'P3']:
+                return JSONResponse({
+                    "success": False,
+                    "error": "Invalid priority. Must be P1, P2, or P3"
+                }, status_code=400)
+            update_fields.append("priority = ?")
+            params.append(priority)
+            
+        if status is not None:
+            if status not in ['backlog', 'doing', 'done']:
+                return JSONResponse({
+                    "success": False,
+                    "error": "Invalid status. Must be backlog, doing, or done"
+                }, status_code=400)
+            update_fields.append("status = ?")
+            params.append(status)
+            
+        if due is not None:
+            update_fields.append("due_date = ?")
+            params.append(due)
+            
+        if athlete_id is not None:
+            update_fields.append("athlete_id = ?")
+            params.append(athlete_id)
+        
+        if not update_fields:
+            return JSONResponse({
+                "success": False,
+                "error": "No fields to update"
+            }, status_code=400)
+        
+        update_fields.append("updated_at = CURRENT_TIMESTAMP")
+        params.append(todo_id)
+        
+        query = f"UPDATE coach_todos SET {', '.join(update_fields)} WHERE id = ?"
+        cursor.execute(query, params)
+        conn.commit()
+        
+        # Get updated todo
+        cursor.execute("""
+            SELECT ct.*, a.name as athlete_name 
+            FROM coach_todos ct 
+            LEFT JOIN athletes a ON ct.athlete_id = a.id 
+            WHERE ct.id = ?
+        """, (todo_id,))
+        
+        row = cursor.fetchone()
+        if row:
+            todo = {
+                "id": row[0],
+                "athlete_id": row[1],
+                "text": row[2],
+                "priority": row[3],
+                "status": row[4],
+                "due_date": row[5],
+                "created_by": row[6],
+                "source_record_id": row[7],
+                "created_at": row[8],
+                "updated_at": row[9],
+                "athlete_name": row[10]
+            }
+            
+            return JSONResponse({
+                "success": True,
+                "todo": todo
+            })
+        
+        return JSONResponse({
+            "success": False,
+            "error": "Failed to update todo"
+        }, status_code=500)
+        
+    except Exception as e:
+        logger.error(f"Error updating coach todo: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.delete("/api/todos/{todo_id}", response_class=JSONResponse)
+async def delete_coach_todo(todo_id: int) -> JSONResponse:
+    """Delete a coach todo"""
+    try:
+        cursor = conn.cursor()
+        
+        # Check if todo exists
+        cursor.execute("SELECT id FROM coach_todos WHERE id = ?", (todo_id,))
+        if not cursor.fetchone():
+            return JSONResponse({
+                "success": False,
+                "error": "Todo not found"
+            }, status_code=404)
+        
+        cursor.execute("DELETE FROM coach_todos WHERE id = ?", (todo_id,))
+        conn.commit()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Todo deleted successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting coach todo: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+# Enhanced highlights endpoints
+@app.get("/api/athletes/{athlete_id}/highlights", response_class=JSONResponse)
+async def get_athlete_highlights_enhanced(
+    athlete_id: int,
+    active_only: bool = Query(True, description="Only return active highlights"),
+    manual_only: bool = Query(False, description="Only return manual highlights")
+) -> JSONResponse:
+    """Get highlights for a specific athlete with enhanced filtering"""
+    try:
+        cursor = conn.cursor()
+        
+        query = """
+            SELECT 
+                h.id,
+                h.athlete_id,
+                h.highlight_text,
+                h.category,
+                h.categories,
+                h.score,
+                h.source,
+                h.status,
+                h.reviewed_by,
+                h.is_manual,
+                h.is_active,
+                h.created_at,
+                h.updated_at,
+                a.name as athlete_name,
+                h.source_conversation_id
+            FROM athlete_highlights h
+            LEFT JOIN athletes a ON h.athlete_id = a.id
+            WHERE h.athlete_id = ?
+        """
+        params = [athlete_id]
+        
+        if active_only:
+            query += " AND h.is_active = 1"
+            
+        if manual_only:
+            query += " AND h.is_manual = 1"
+            
+        query += " ORDER BY h.created_at DESC"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        highlights = []
+        for row in rows:
+            # Parse categories from JSON or CSV
+            categories_str = row[4] if len(row) > 4 and row[4] else ""
+            categories = []
+            if categories_str:
+                try:
+                    # Ensure categories_str is a string
+                    if isinstance(categories_str, str):
+                        # Try to parse as JSON first
+                        categories = json.loads(categories_str)
+                    else:
+                        # If it's not a string, use empty array
+                        categories = []
+                except:
+                    # Fallback to CSV only if it's a string
+                    if isinstance(categories_str, str):
+                        categories = [c.strip() for c in categories_str.split(',') if c.strip()]
+                    else:
+                        categories = []
+            
+            # Safely access row elements with bounds checking
+            row_length = len(row)
+            
+            highlights.append({
+                "id": row[0] if row_length > 0 else None,
+                "athlete_id": row[1] if row_length > 1 else None,
+                "highlight_text": row[2] if row_length > 2 else "",
+                "category": row[3] if row_length > 3 else "general",
+                "categories": categories,
+                "score": row[5] if row_length > 5 else 0.0,
+                "source": row[6] if row_length > 6 else "manual",
+                "status": row[7] if row_length > 7 else "accepted",
+                "reviewed_by": row[8] if row_length > 8 else None,
+                "is_manual": bool(row[9]) if row_length > 9 else False,
+                "is_active": bool(row[10]) if row_length > 10 else True,
+                "created_at": row[11] if row_length > 11 else None,
+                "updated_at": row[12] if row_length > 12 else None,
+                "athlete_name": row[13] if row_length > 13 else None,
+                "source_conversation_id": row[14] if row_length > 14 else None
+            })
+            
+        return JSONResponse({
+            "success": True,
+            "highlights": highlights,
+            "count": len(highlights)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting athlete highlights: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.post("/ai/highlights", response_class=JSONResponse)
+async def generate_ai_highlights_with_tags(
+    text: str = Form(...),
+    athlete_id: Optional[int] = Form(None)
+) -> JSONResponse:
+    """Generate AI highlights with tags from text"""
+    
+    # Check if automatic GPT is enabled
+    if not AUTO_GPT_ENABLED:
+        return JSONResponse({
+            "success": True,
+            "highlights": [],
+            "message": "Automatic GPT highlights generation is disabled"
+        })
+    
+    try:
+        # Get athlete context if available
+        athlete_context = ""
+        if athlete_id:
+            conn = sqlite3.connect('database.db')
+            cursor = conn.cursor()
+            cursor.execute("SELECT name, sport, level FROM athletes WHERE id = ?", (athlete_id,))
+            athlete = cursor.fetchone()
+            conn.close()
+            
+            if athlete:
+                athlete_name, sport, level = athlete
+                athlete_context = f"Atleta: {athlete_name} ({sport}, nivel {level})\n"
+        
+        prompt = f"""
+        {athlete_context}
+        Analiza el siguiente texto y genera 2-3 highlights relevantes con etiquetas apropiadas.
+        
+        Texto: {text}
+        
+        Genera highlights que capturen:
+        - Progreso del atleta
+        - Problemas o preocupaciones
+        - Objetivos o planes
+        - Aspectos técnicos importantes
+        - Factores de riesgo (lesiones, fatiga, etc.)
+        
+        Etiquetas disponibles: Técnica, Nutrición, Psicología, Lesiones, Planificación, Objetivos, Problemas, Progreso, General
+        
+        Responde con un array JSON de objetos, cada uno con "text" y "tags":
+        [
+            {{"text": "Highlight 1", "tags": ["Técnica", "Progreso"]}},
+            {{"text": "Highlight 2", "tags": ["Psicología"]}}
+        ]
+        """
+        
+        try:
+            response_ai = await openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=400
+            )
+            
+            highlights_text = response_ai.choices[0].message.content.strip()
+            
+            # Try to parse as JSON array
+            try:
+                highlights = json.loads(highlights_text)
+                if not isinstance(highlights, list):
+                    highlights = [{"text": highlights_text, "tags": ["General"]}]
+            except:
+                # If not valid JSON, create simple highlights
+                highlights = [
+                    {"text": f"Conversación relevante: {text[:100]}...", "tags": ["General"]}
+                ]
+            
+            # Validate and clean highlights
+            valid_highlights = []
+            valid_tags = ["Técnica", "Nutrición", "Psicología", "Lesiones", "Planificación", "Objetivos", "Problemas", "Progreso", "General"]
+            
+            for highlight in highlights[:3]:  # Limit to 3 highlights
+                if isinstance(highlight, dict) and "text" in highlight:
+                    # Clean and validate tags
+                    tags = highlight.get("tags", [])
+                    if isinstance(tags, list):
+                        valid_tags_for_highlight = [tag for tag in tags if tag in valid_tags]
+                        if not valid_tags_for_highlight:
+                            valid_tags_for_highlight = ["General"]
+                    else:
+                        valid_tags_for_highlight = ["General"]
+                    
+                    valid_highlights.append({
+                        "text": highlight["text"].strip(),
+                        "tags": valid_tags_for_highlight
+                    })
+            
+            return JSONResponse({
+                "success": True,
+                "highlights": valid_highlights,
+                "count": len(valid_highlights)
+            })
+            
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {api_error}")
+            return JSONResponse({
+                "success": False,
+                "error": f"Error generating highlights: {str(api_error)}"
+            }, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error generating AI highlights: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        }, status_code=500)
+
+@app.get("/api/athletes/{athlete_id}/risk", response_class=JSONResponse)
+async def get_athlete_risk(athlete_id: int) -> JSONResponse:
+    """Get risk assessment for an athlete using GPT-4o-mini analysis."""
+    try:
+        # Check if automatic GPT is enabled
+        if not AUTO_GPT_ENABLED:
+            # Return simple risk assessment without GPT
+            risk_data = get_athlete_risk_factors(athlete_id)
+            
+            if not risk_data:
+                return JSONResponse({
+                    "status": "error",
+                    "message": "Athlete not found"
+                }, status_code=404)
+            
+            return JSONResponse({
+                "athlete_id": risk_data['athlete_id'],
+                "athlete_name": risk_data['athlete_name'],
+                "score": risk_data['score'],
+                "level": risk_data['level'],
+                "color": risk_data['color'],
+                "factors": risk_data['factors'],
+                "evidence": risk_data.get('evidence', []),
+                "raw_score": risk_data.get('raw_score', 0),
+                "smoothed_score": risk_data.get('smoothed_score', 0),
+                "last_contact": risk_data.get('last_contact'),
+                "days_since_contact": risk_data.get('days_since_contact', 0),
+                "overdue_count": risk_data.get('overdue_count', 0),
+                "gpt_analysis": {}
+            })
+        
+        # Calculate risk factors using GPT analysis
+        risk_data = await get_athlete_risk_factors_gpt(athlete_id)
+        
+        if not risk_data:
+            return JSONResponse({
+                "status": "error",
+                "message": "Athlete not found"
+            }, status_code=404)
+        
+        # Save to history table
+        try:
+            with conn:
+                conn.execute("""
+                    INSERT INTO athlete_risk_history 
+                    (athlete_id, score, level, factors_json) 
+                    VALUES (?, ?, ?, ?)
+                """, (
+                    athlete_id,
+                    risk_data['score'],
+                    risk_data['level'],
+                    json.dumps(risk_data['factors'])
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Error saving risk history: {e}")
+        
+        # Return the risk assessment
+        return JSONResponse({
+            "athlete_id": risk_data['athlete_id'],
+            "athlete_name": risk_data['athlete_name'],
+            "score": risk_data['score'],
+            "level": risk_data['level'],
+            "color": risk_data['color'],
+            "factors": risk_data['factors'],
+            "evidence": risk_data['evidence'],
+            "raw_score": risk_data['raw_score'],
+            "smoothed_score": risk_data['smoothed_score'],
+            "last_contact": risk_data['last_contact'],
+            "days_since_contact": risk_data['days_since_contact'],
+            "overdue_count": risk_data['overdue_count'],
+            "gpt_analysis": risk_data.get('gpt_analysis', {})
+        })
+        
+    except Exception as e:
+        logger.error(f"Error calculating risk for athlete {athlete_id}: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"Error calculating risk: {str(e)}"
+        }, status_code=500)
+
+def init_risk_history_table():
+    """Initialize the athlete risk history table."""
+    try:
+        with conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS athlete_risk_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    athlete_id INTEGER NOT NULL,
+                    score REAL NOT NULL,
+                    level TEXT NOT NULL,
+                    factors_json TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (athlete_id) REFERENCES athletes (id)
+                )
+            """)
+            conn.commit()
+            logger.info("Risk history table initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing risk history table: {e}")
+
+# Risk Radar Configuration
+RISK_WEIGHTS = {
+    'inactivity': 0.30,
+    'overdue': 0.20, 
+    'neg_high': 0.25,
+    'sentiment': 0.15,
+    'pain': 0.10
+}
+
+RISK_KEYWORDS = {
+    'sleep': ["sueño", "dormir", "cansado", "fatiga", "descanso", "insomnio", "despertar", "no duermo", "mal sueño"],
+    'pain': ["dolor", "lesión", "molestia", "herida", "inflamación", "contractura", "tirón", "duele", "inflamado"],
+    'negative': ["no puedo", "imposible", "difícil", "problema", "mal", "terrible", "horrible", "frustrado", "estresado", "ansioso", "deprimido"],
+    'psychology': ["psicología", "mental", "motivación", "ánimo", "estado de ánimo", "depresión", "ansiedad"]
+}
+
+def normalize_inactivity(days):
+    """Normalize inactivity days using exponential decay."""
+    x = max(0, days - 3)
+    return 1 - math.exp(-x / 3)
+
+async def get_athlete_risk_factors_gpt(athlete_id: int) -> dict:
+    """Calculate risk factors for an athlete using GPT-4o-mini analysis."""
+    try:
+        with conn:
+            # Get athlete data
+            cursor = conn.execute(
+                "SELECT id, name, created_at FROM athletes WHERE id = ?",
+                (athlete_id,)
+            )
+            athlete = cursor.fetchone()
+            
+            if not athlete:
+                return None
+            
+            # Get recent conversations (last 30 days)
+            cursor.execute("""
+                SELECT 
+                    r.transcription,
+                    r.final_response,
+                    r.timestamp,
+                    r.category,
+                    r.source
+                FROM records r
+                WHERE r.athlete_id = ?
+                AND r.timestamp >= datetime('now', '-30 days')
+                ORDER BY r.timestamp DESC
+                LIMIT 10
+            """, (athlete_id,))
+            
+            conversations = cursor.fetchall()
+            
+            # Get overdue todos
+            cursor.execute("""
+                SELECT 
+                    t.id,
+                    t.text,
+                    t.due_date,
+                    t.status,
+                    t.created_at
+                FROM coach_todos t
+                WHERE t.athlete_id = ?
+                AND t.status != 'done'
+                AND (t.due_date IS NULL OR t.due_date < date('now'))
+                ORDER BY t.due_date ASC
+            """, (athlete_id,))
+            
+            overdue_todos = cursor.fetchall()
+            
+            # Get recent highlights (last 14 days)
+            cursor.execute("""
+                SELECT 
+                    h.highlight_text,
+                    h.categories,
+                    h.created_at
+                FROM athlete_highlights h
+                WHERE h.athlete_id = ?
+                AND h.is_active = 1
+                AND h.created_at >= datetime('now', '-14 days')
+                ORDER BY h.created_at DESC
+            """, (athlete_id,))
+            
+            recent_highlights = cursor.fetchall()
+            
+            # Calculate S1: Inactivity (same as before)
+            last_contact = None
+            if conversations:
+                last_contact = conversations[0][2]
+            
+            days_since_contact = 0
+            if last_contact:
+                from datetime import datetime
+                last_contact_date = datetime.fromisoformat(last_contact.replace('Z', '+00:00'))
+                now = datetime.now()
+                days_since_contact = (now - last_contact_date).days
+            else:
+                days_since_contact = 30
+            
+            s1 = normalize_inactivity(days_since_contact)
+            
+            # Calculate S2: Overdue todos (same as before)
+            overdue_count = len(overdue_todos)
+            very_overdue_count = 0
+            
+            for todo in overdue_todos:
+                if todo[2]:  # due_date
+                    try:
+                        due_date = datetime.fromisoformat(todo[2])
+                        days_overdue = (datetime.now() - due_date).days
+                        if days_overdue > 7:
+                            very_overdue_count += 1
+                    except (ValueError, TypeError):
+                        continue
+            
+            s2 = min(1, (0.5 * overdue_count + 1.0 * very_overdue_count) / 5)
+            
+            # Calculate S3-S5 using GPT analysis
+            gpt_analyzer = GPTRiskAnalyzer(openai_client)
+            
+            # Analyze conversations with GPT
+            conversation_data = [(conv[0] or "", conv[1] or "") for conv in conversations[:7]]
+            gpt_results = await gpt_analyzer.analyze_conversation_batch(conversation_data)
+            
+            # Calculate sentiment moving average (S4)
+            sentiment_scores = gpt_results['sentiment']
+            sentiment_mm7 = sum(sentiment_scores) / max(1, len(sentiment_scores))
+            s4 = max(0, min(1, (0 - sentiment_mm7) / 1.0))  # Negative sentiment increases risk
+            
+            # Calculate pain/injury mentions (S5)
+            pain_scores = gpt_results['pain_injury']
+            pain_matches = sum(1 for score in pain_scores if score > 0.3)
+            s5 = min(1, pain_matches / 3)
+            
+            # Analyze highlights with GPT
+            highlight_texts = [h[0] for h in recent_highlights]
+            highlight_analysis = await gpt_analyzer.analyze_highlights(highlight_texts)
+            
+            # Calculate negative highlights ratio (S3)
+            s3 = highlight_analysis['negative_ratio']
+            
+            # Calculate raw score
+            raw_score = 100 * (
+                RISK_WEIGHTS['inactivity'] * s1 +
+                RISK_WEIGHTS['overdue'] * s2 +
+                RISK_WEIGHTS['neg_high'] * s3 +
+                RISK_WEIGHTS['sentiment'] * s4 +
+                RISK_WEIGHTS['pain'] * s5
+            )
+            
+            # Get previous score for smoothing
+            cursor.execute("""
+                SELECT score FROM athlete_risk_history 
+                WHERE athlete_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            """, (athlete_id,))
+            
+            prev_score_result = cursor.fetchone()
+            prev_score = prev_score_result[0] if prev_score_result else raw_score
+            
+            # Apply exponential smoothing
+            alpha = 0.5
+            final_score = alpha * raw_score + (1 - alpha) * prev_score
+            
+            # Determine risk level
+            if final_score >= 65:
+                level = "rojo"
+                color = "danger"
+            elif final_score >= 35:
+                level = "ámbar"
+                color = "warning"
+            else:
+                level = "verde"
+                color = "success"
+            
+            # Build evidence list with GPT insights
+            evidence = []
+            
+            if days_since_contact > 0:
+                evidence.append(f"Último contacto: {last_contact or 'Nunca'} ({days_since_contact} días)")
+            
+            if overdue_count > 0:
+                todo_list = ", ".join([f"'{todo[1]}'" for todo in overdue_todos[:3]])
+                evidence.append(f"{overdue_count} vencidos: {todo_list}")
+            
+            if s3 > 0:
+                evidence.append(f"{s3:.1%} highlights negativos (GPT analysis)")
+            
+            if sentiment_mm7 < 0:
+                evidence.append(f"Sentimiento GPT mm7 = {sentiment_mm7:.2f}")
+            
+            if pain_matches > 0:
+                evidence.append(f"Dolor/lesión detectado por GPT ({pain_matches} veces en 7d)")
+            
+            # Additional GPT insights
+            if highlight_analysis['pain_injury_ratio'] > 0:
+                evidence.append(f"GPT detectó {highlight_analysis['pain_injury_ratio']:.1%} highlights con dolor/lesión")
+            
+            if highlight_analysis['sleep_fatigue_ratio'] > 0:
+                evidence.append(f"GPT detectó {highlight_analysis['sleep_fatigue_ratio']:.1%} highlights con problemas de sueño")
+            
+            # Build factors JSON with GPT analysis
+            factors = {
+                'inactivity': {
+                    'value': s1,
+                    'weight': RISK_WEIGHTS['inactivity'],
+                    'contribution': s1 * RISK_WEIGHTS['inactivity'] * 100,
+                    'evidence': evidence[0] if evidence else "Sin evidencia"
+                },
+                'overdue': {
+                    'value': s2,
+                    'weight': RISK_WEIGHTS['overdue'],
+                    'contribution': s2 * RISK_WEIGHTS['overdue'] * 100,
+                    'evidence': evidence[1] if len(evidence) > 1 else "Sin evidencia"
+                },
+                'neg_high': {
+                    'value': s3,
+                    'weight': RISK_WEIGHTS['neg_high'],
+                    'contribution': s3 * RISK_WEIGHTS['neg_high'] * 100,
+                    'evidence': evidence[2] if len(evidence) > 2 else "Sin evidencia"
+                },
+                'sentiment': {
+                    'value': s4,
+                    'weight': RISK_WEIGHTS['sentiment'],
+                    'contribution': s4 * RISK_WEIGHTS['sentiment'] * 100,
+                    'evidence': evidence[3] if len(evidence) > 3 else "Sin evidencia"
+                },
+                'pain': {
+                    'value': s5,
+                    'weight': RISK_WEIGHTS['pain'],
+                    'contribution': s5 * RISK_WEIGHTS['pain'] * 100,
+                    'evidence': evidence[4] if len(evidence) > 4 else "Sin evidencia"
+                }
+            }
+            
+            return {
+                'athlete_id': athlete_id,
+                'athlete_name': athlete[1],
+                'score': round(final_score, 1),
+                'level': level,
+                'color': color,
+                'factors': factors,
+                'evidence': evidence,
+                'raw_score': round(raw_score, 1),
+                'smoothed_score': round(final_score, 1),
+                'last_contact': last_contact,
+                'days_since_contact': days_since_contact,
+                'overdue_count': overdue_count,
+                'gpt_analysis': {
+                    'sentiment_mm7': round(sentiment_mm7, 2),
+                    'pain_matches': pain_matches,
+                    'highlight_analysis': highlight_analysis
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Error calculating GPT risk factors for athlete {athlete_id}: {e}")
+        return None
+
+@app.post("/api/risk/recompute", response_class=JSONResponse)
+async def recompute_all_risks() -> JSONResponse:
+    """Recalculate risk scores for all athletes and save to history."""
+    try:
+        with conn:
+            # Get all athletes
+            cursor = conn.execute("SELECT id, name FROM athletes")
+            athletes = cursor.fetchall()
+            
+            results = []
+            total_processed = 0
+            
+            for athlete in athletes:
+                athlete_id = athlete[0]
+                athlete_name = athlete[1]
+                
+                try:
+                    # Calculate risk factors
+                    risk_data = get_athlete_risk_factors(athlete_id)
+                    
+                    if risk_data:
+                        # Save to history
+                        conn.execute("""
+                            INSERT INTO athlete_risk_history 
+                            (athlete_id, score, level, factors_json) 
+                            VALUES (?, ?, ?, ?)
+                        """, (
+                            athlete_id,
+                            risk_data['score'],
+                            risk_data['level'],
+                            json.dumps(risk_data['factors'])
+                        ))
+                        
+                        results.append({
+                            'athlete_id': athlete_id,
+                            'athlete_name': athlete_name,
+                            'score': risk_data['score'],
+                            'level': risk_data['level'],
+                            'color': risk_data['color']
+                        })
+                        
+                        total_processed += 1
+                        
+                except Exception as e:
+                    logger.error(f"Error processing athlete {athlete_id}: {e}")
+                    results.append({
+                        'athlete_id': athlete_id,
+                        'athlete_name': athlete_name,
+                        'error': str(e)
+                    })
+            
+            conn.commit()
+            
+            return JSONResponse({
+                "status": "success",
+                "message": f"Processed {total_processed} athletes",
+                "total_athletes": len(athletes),
+                "processed": total_processed,
+                "results": results
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in batch risk recalculation: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": f"Error in batch recalculation: {str(e)}"
+        }, status_code=500)
+
+# Initialize tables
+init_coach_todos_table()
+init_risk_history_table()
+
+def get_athlete_risk_factors(athlete_id: int) -> dict:
+    """Calculate risk factors for an athlete using the improved algorithm."""
+    try:
+        with conn:
+            # Get athlete data
+            cursor = conn.execute(
+                "SELECT id, name, created_at FROM athletes WHERE id = ?",
+                (athlete_id,)
+            )
+            athlete = cursor.fetchone()
+            
+            if not athlete:
+                return None
+            
+            # Get recent conversations (last 30 days)
+            cursor.execute("""
+                SELECT 
+                    r.transcription,
+                    r.final_response,
+                    r.timestamp,
+                    r.category,
+                    r.source
+                FROM records r
+                WHERE r.athlete_id = ?
+                AND r.timestamp >= datetime('now', '-30 days')
+                ORDER BY r.timestamp DESC
+                LIMIT 10
+            """, (athlete_id,))
+            
+            conversations = cursor.fetchall()
+            
+            # Get overdue todos
+            cursor.execute("""
+                SELECT 
+                    t.id,
+                    t.text,
+                    t.due_date,
+                    t.status,
+                    t.created_at
+                FROM coach_todos t
+                WHERE t.athlete_id = ?
+                AND t.status != 'done'
+                AND (t.due_date IS NULL OR t.due_date < date('now'))
+                ORDER BY t.due_date ASC
+            """, (athlete_id,))
+            
+            overdue_todos = cursor.fetchall()
+            
+            # Get recent highlights (last 14 days)
+            cursor.execute("""
+                SELECT 
+                    h.highlight_text,
+                    h.categories,
+                    h.created_at
+                FROM athlete_highlights h
+                WHERE h.athlete_id = ?
+                AND h.is_active = 1
+                AND h.created_at >= datetime('now', '-14 days')
+                ORDER BY h.created_at DESC
+            """, (athlete_id,))
+            
+            recent_highlights = cursor.fetchall()
+            
+            # Calculate S1: Inactivity
+            last_contact = None
+            if conversations:
+                last_contact = conversations[0][2]  # timestamp of most recent conversation
+            
+            days_since_contact = 0
+            if last_contact:
+                from datetime import datetime
+                last_contact_date = datetime.fromisoformat(last_contact.replace('Z', '+00:00'))
+                now = datetime.now()
+                days_since_contact = (now - last_contact_date).days
+            else:
+                days_since_contact = 30  # Default if no contact
+            
+            s1 = normalize_inactivity(days_since_contact)
+            
+            # Calculate S2: Overdue todos
+            overdue_count = len(overdue_todos)
+            very_overdue_count = 0
+            
+            for todo in overdue_todos:
+                if todo[2]:  # due_date
+                    try:
+                        due_date = datetime.fromisoformat(todo[2])
+                        days_overdue = (datetime.now() - due_date).days
+                        if days_overdue > 7:
+                            very_overdue_count += 1
+                    except (ValueError, TypeError):
+                        # Skip if date format is invalid
+                        continue
+            
+            s2 = min(1, (0.5 * overdue_count + 1.0 * very_overdue_count) / 5)
+            
+            # Calculate S3: Negative highlights ratio
+            negative_highlights = 0
+            total_highlights = len(recent_highlights)
+            
+            negative_tags = ['lesión', 'dolor', 'problema', 'fatiga', 'psicología_negativa']
+            
+            for highlight in recent_highlights:
+                highlight_text = highlight[0].lower()
+                categories = highlight[1] or ""
+                
+                # Check for negative keywords in text
+                for keyword in RISK_KEYWORDS['pain'] + RISK_KEYWORDS['negative'] + RISK_KEYWORDS['psychology']:
+                    if keyword in highlight_text:
+                        negative_highlights += 1
+                        break
+                
+                # Check for negative tags
+                for tag in negative_tags:
+                    if tag in categories.lower():
+                        negative_highlights += 1
+                        break
+            
+            s3 = negative_highlights / max(1, total_highlights)
+            
+            # Calculate S4: Sentiment (simple moving average 7 days)
+            sentiment_scores = []
+            recent_conversations = conversations[:7]  # Last 7 conversations
+            
+            for conv in recent_conversations:
+                transcription = (conv[0] or "").lower()
+                response = (conv[1] or "").lower()
+                
+                # Simple sentiment analysis
+                positive_words = ["bien", "genial", "excelente", "perfecto", "mejor", "progreso", "feliz", "contento"]
+                negative_words = RISK_KEYWORDS['negative']
+                
+                positive_count = sum(transcription.count(word) + response.count(word) for word in positive_words)
+                negative_count = sum(transcription.count(word) + response.count(word) for word in negative_words)
+                
+                if positive_count > negative_count:
+                    sentiment_scores.append(1)
+                elif negative_count > positive_count:
+                    sentiment_scores.append(-1)
+                else:
+                    sentiment_scores.append(0)
+            
+            sentiment_mm7 = sum(sentiment_scores) / max(1, len(sentiment_scores))
+            s4 = max(0, min(1, (0 - sentiment_mm7) / 1.0))  # Negative sentiment increases risk
+            
+            # Calculate S5: Pain/injury keywords in last 7 days
+            pain_matches = 0
+            recent_text = ""
+            
+            for conv in recent_conversations:
+                recent_text += " " + (conv[0] or "") + " " + (conv[1] or "")
+            
+            recent_text = recent_text.lower()
+            
+            for keyword in RISK_KEYWORDS['pain']:
+                pain_matches += recent_text.count(keyword)
+            
+            s5 = min(1, pain_matches / 3)
+            
+            # Calculate raw score
+            raw_score = 100 * (
+                RISK_WEIGHTS['inactivity'] * s1 +
+                RISK_WEIGHTS['overdue'] * s2 +
+                RISK_WEIGHTS['neg_high'] * s3 +
+                RISK_WEIGHTS['sentiment'] * s4 +
+                RISK_WEIGHTS['pain'] * s5
+            )
+            
+            # Get previous score for smoothing
+            cursor.execute("""
+                SELECT score FROM athlete_risk_history 
+                WHERE athlete_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            """, (athlete_id,))
+            
+            prev_score_result = cursor.fetchone()
+            prev_score = prev_score_result[0] if prev_score_result else raw_score
+            
+            # Apply exponential smoothing
+            alpha = 0.5
+            final_score = alpha * raw_score + (1 - alpha) * prev_score
+            
+            # Determine risk level
+            if final_score >= 65:
+                level = "rojo"
+                color = "danger"
+            elif final_score >= 35:
+                level = "ámbar"
+                color = "warning"
+            else:
+                level = "verde"
+                color = "success"
+            
+            # Build evidence list
+            evidence = []
+            
+            if days_since_contact > 0:
+                evidence.append(f"Último contacto: {last_contact or 'Nunca'} ({days_since_contact} días)")
+            
+            if overdue_count > 0:
+                todo_list = ", ".join([f"'{todo[1]}'" for todo in overdue_todos[:3]])
+                evidence.append(f"{overdue_count} vencidos: {todo_list}")
+            
+            if negative_highlights > 0:
+                evidence.append(f"{negative_highlights}/{total_highlights} highlights negativos")
+            
+            if sentiment_mm7 < 0:
+                evidence.append(f"Sentimiento mm7 = {sentiment_mm7:.2f}")
+            
+            if pain_matches > 0:
+                evidence.append(f"Palabras clave dolor/lesión ({pain_matches} veces en 7d)")
+            
+            # Build factors JSON
+            factors = {
+                'inactivity': {
+                    'value': s1,
+                    'weight': RISK_WEIGHTS['inactivity'],
+                    'contribution': s1 * RISK_WEIGHTS['inactivity'] * 100,
+                    'evidence': evidence[0] if evidence else "Sin evidencia"
+                },
+                'overdue': {
+                    'value': s2,
+                    'weight': RISK_WEIGHTS['overdue'],
+                    'contribution': s2 * RISK_WEIGHTS['overdue'] * 100,
+                    'evidence': evidence[1] if len(evidence) > 1 else "Sin evidencia"
+                },
+                'neg_high': {
+                    'value': s3,
+                    'weight': RISK_WEIGHTS['neg_high'],
+                    'contribution': s3 * RISK_WEIGHTS['neg_high'] * 100,
+                    'evidence': evidence[2] if len(evidence) > 2 else "Sin evidencia"
+                },
+                'sentiment': {
+                    'value': s4,
+                    'weight': RISK_WEIGHTS['sentiment'],
+                    'contribution': s4 * RISK_WEIGHTS['sentiment'] * 100,
+                    'evidence': evidence[3] if len(evidence) > 3 else "Sin evidencia"
+                },
+                'pain': {
+                    'value': s5,
+                    'weight': RISK_WEIGHTS['pain'],
+                    'contribution': s5 * RISK_WEIGHTS['pain'] * 100,
+                    'evidence': evidence[4] if len(evidence) > 4 else "Sin evidencia"
+                }
+            }
+            
+            return {
+                'athlete_id': athlete_id,
+                'athlete_name': athlete[1],
+                'score': round(final_score, 1),
+                'level': level,
+                'color': color,
+                'factors': factors,
+                'evidence': evidence,
+                'raw_score': round(raw_score, 1),
+                'smoothed_score': round(final_score, 1),
+                'last_contact': last_contact,
+                'days_since_contact': days_since_contact,
+                'overdue_count': overdue_count,
+                'negative_highlights': negative_highlights,
+                'total_highlights': total_highlights,
+                'sentiment_mm7': round(sentiment_mm7, 2),
+                'pain_matches': pain_matches
+            }
+            
+    except Exception as e:
+        logger.error(f"Error calculating risk factors for athlete {athlete_id}: {e}")
+        return None
+
+# Outreach endpoints
+@app.post("/api/outreach/generate", response_class=JSONResponse)
+async def generate_outreach_message(body: dict) -> JSONResponse:
     """
-    result = generate_highlights_from_conversation(
-        athlete_id=athlete_id,
-        conversation_id=conversation_id,
-        transcription=transcription,
-        response=response
-    )
-    return JSONResponse(result)
+    Generate outreach messages using GPT-4o-mini based on athlete context
+    """
+    try:
+        # Validate required fields
+        if not body.get("athlete") or not body.get("risk"):
+            raise HTTPException(status_code=400, detail="Missing required fields: athlete and risk")
+        
+        # Generate outreach messages
+        result = generate_outreach(body)
+        
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        logger.error(f"Error generating outreach: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/outreach/generate/{athlete_id}", response_class=JSONResponse)
+async def generate_outreach_for_athlete(athlete_id: int, body: dict = {}) -> JSONResponse:
+    """
+    Generate outreach messages for a specific athlete using their context
+    """
+    try:
+        # Get athlete data
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, name, email, phone, sport, level
+            FROM athletes 
+            WHERE id = ?
+        """, (athlete_id,))
+        
+        athlete_data = cursor.fetchone()
+        if not athlete_data:
+            raise HTTPException(status_code=404, detail="Athlete not found")
+        
+        # Get athlete risk data
+        risk_data = get_athlete_risk_factors(athlete_id)
+        if not risk_data:
+            risk_data = {
+                "score": 50,
+                "level": "yellow",
+                "factors": []
+            }
+        
+        # Get recent highlights
+        highlights = get_athlete_highlights(athlete_id, active_only=True)
+        
+        # Get recent conversation excerpt
+        cursor.execute("""
+            SELECT transcription, final_response 
+            FROM records 
+            WHERE athlete_id = ? 
+            ORDER BY timestamp DESC 
+            LIMIT 1
+        """, (athlete_id,))
+        
+        conversation = cursor.fetchone()
+        conversation_excerpt = ""
+        if conversation:
+            conversation_excerpt = f"{conversation[0]} {conversation[1]}"[:800]
+        
+        # Build payload
+        payload = {
+            "athlete": {
+                "id": athlete_data[0],
+                "first_name": athlete_data[1].split()[0] if athlete_data[1] else "Atleta",
+                "locale": "es-ES",  # Default to Spanish
+                "sport": athlete_data[4] or "Running",
+                "goal": "Mejorar rendimiento"
+            },
+            "risk": {
+                "score": risk_data.get("score", 50),
+                "level": risk_data.get("level", "yellow"),
+                "factors": risk_data.get("factors", {})
+            },
+            "highlights_recent": [
+                {"category": h.get("category", "general"), "text": h.get("text", "")}
+                for h in highlights[:5]
+            ],
+            "conversation_excerpt": conversation_excerpt,
+            "channel_pref": body.get("channel_pref", ["whatsapp", "email"]),
+            "coach": {
+                "name": "Ramon",
+                "calendar_url": "https://calendly.com/ramon"
+            }
+        }
+        
+        # Generate outreach
+        result = generate_outreach(payload)
+        
+        return JSONResponse(content=result)
+        
+    except Exception as e:
+        logger.error(f"Error generating outreach for athlete {athlete_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
