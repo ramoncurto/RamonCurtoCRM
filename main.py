@@ -313,8 +313,48 @@ def init_coach_todos_table():
     
     conn.commit()
 
+# Add todos table for workflow
+def init_todos_table():
+    """Initialize the todos table for workflow todo management"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            athlete_id INTEGER NOT NULL,
+            message_id INTEGER,
+            title TEXT NOT NULL,
+            details TEXT,
+            status TEXT CHECK(status IN ('pending', 'in_progress', 'completed', 'cancelled')) DEFAULT 'pending',
+            priority TEXT CHECK(priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
+            due_at DATE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (athlete_id) REFERENCES athletes(id),
+            FOREIGN KEY (message_id) REFERENCES messages(id)
+        )
+    """)
+    
+    # Check if priority column exists, if not add it
+    cursor.execute("PRAGMA table_info(todos)")
+    columns = [column[1] for column in cursor.fetchall()]
+    
+    if 'priority' not in columns:
+        cursor.execute("ALTER TABLE todos ADD COLUMN priority TEXT CHECK(priority IN ('low', 'medium', 'high')) DEFAULT 'medium'")
+        print("✅ Added priority column to todos table")
+    
+    # Create indexes for performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_athlete_id ON todos(athlete_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_message_id ON todos(message_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_status ON todos(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_todos_priority ON todos(priority)")
+    
+    conn.commit()
+
 # Initialize coach todos table
 init_coach_todos_table()
+
+# Initialize todos table
+init_todos_table()
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -1048,10 +1088,10 @@ async def get_athletes_enhanced() -> JSONResponse:
                 a.sport, 
                 a.level, 
                 a.created_at,
-                MAX(r.timestamp) as last_contact,
+                MAX(m.created_at) as last_contact,
                 COUNT(CASE WHEN ct.status IN ('backlog', 'doing') THEN 1 END) as open_todos
             FROM athletes a
-            LEFT JOIN records r ON a.id = r.athlete_id
+            LEFT JOIN messages m ON a.id = m.athlete_id
             LEFT JOIN coach_todos ct ON a.id = ct.athlete_id
             GROUP BY a.id, a.name, a.email, a.phone, a.sport, a.level, a.created_at
             ORDER BY a.name
@@ -1237,7 +1277,7 @@ async def delete_athlete(athlete_id: int) -> JSONResponse:
             
             # Delete associated records
             conn.execute("DELETE FROM records WHERE athlete_id = ?", (athlete_id,))
-            conn.execute("DELETE FROM athlete_highlights WHERE athlete_id = ?", (athlete_id,))
+            conn.execute("DELETE FROM highlights WHERE athlete_id = ?", (athlete_id,))
             conn.execute("DELETE FROM athlete_metrics WHERE athlete_id = ?", (athlete_id,))
             
             # Delete the athlete
@@ -1422,7 +1462,7 @@ def add_athlete_highlight(
         with conn:
             cursor = conn.execute(
                 """
-                INSERT INTO athlete_highlights 
+                INSERT INTO highlights 
                 (athlete_id, highlight_text, category, source_conversation_id)
                 VALUES (?, ?, ?, ?)
                 """,
@@ -1462,9 +1502,9 @@ def get_athlete_highlights(athlete_id: int, active_only: bool = True) -> list:
             query = """
                 SELECT h.id, h.highlight_text, h.category, h.created_at, 
                        h.updated_at, h.is_active, h.source_conversation_id,
-                       r.transcription, r.final_response
-                FROM athlete_highlights h
-                LEFT JOIN records r ON h.source_conversation_id = r.id
+                       m.transcription, m.final_response
+                FROM highlights h
+                LEFT JOIN messages m ON h.source_conversation_id = m.id
                 WHERE h.athlete_id = ?
             """
             if active_only:
@@ -1512,7 +1552,7 @@ def update_highlight_status(highlight_id: int, is_active: bool) -> dict:
         with conn:
             conn.execute(
                 """
-                UPDATE athlete_highlights 
+                UPDATE highlights 
                 SET is_active = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
@@ -1546,7 +1586,7 @@ def delete_highlight(highlight_id: int) -> dict:
     try:
         with conn:
             conn.execute(
-                "DELETE FROM athlete_highlights WHERE id = ?",
+                "DELETE FROM highlights WHERE id = ?",
                 (highlight_id,)
             )
         return {
@@ -1706,7 +1746,7 @@ async def create_athlete_highlight_enhanced(
                 categories_json = "[]"
         
         cursor.execute("""
-            INSERT INTO athlete_highlights (
+            INSERT INTO highlights (
                 athlete_id, highlight_text, category, categories, 
                 source_conversation_id, is_manual, is_active
             ) VALUES (?, ?, ?, ?, ?, 1, 1)
@@ -1718,7 +1758,7 @@ async def create_athlete_highlight_enhanced(
         # Get the created highlight
         cursor.execute("""
             SELECT h.*, a.name as athlete_name
-            FROM athlete_highlights h
+            FROM highlights h
             LEFT JOIN athletes a ON h.athlete_id = a.id
             WHERE h.id = ?
         """, (highlight_id,))
@@ -1780,7 +1820,7 @@ async def update_highlight_enhanced(
         cursor = conn.cursor()
         
         # Get current highlight
-        cursor.execute("SELECT * FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        cursor.execute("SELECT * FROM highlights WHERE id = ?", (highlight_id,))
         current = cursor.fetchone()
         
         if not current:
@@ -1829,14 +1869,14 @@ async def update_highlight_enhanced(
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
         params.append(highlight_id)
         
-        query = f"UPDATE athlete_highlights SET {', '.join(update_fields)} WHERE id = ?"
+        query = f"UPDATE highlights SET {', '.join(update_fields)} WHERE id = ?"
         cursor.execute(query, params)
         conn.commit()
         
         # Get updated highlight
         cursor.execute("""
             SELECT h.*, a.name as athlete_name
-            FROM athlete_highlights h
+            FROM highlights h
             LEFT JOIN athletes a ON h.athlete_id = a.id
             WHERE h.id = ?
         """, (highlight_id,))
@@ -1892,14 +1932,14 @@ async def delete_highlight_enhanced(highlight_id: int) -> JSONResponse:
         cursor = conn.cursor()
         
         # Check if highlight exists
-        cursor.execute("SELECT id FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        cursor.execute("SELECT id FROM highlights WHERE id = ?", (highlight_id,))
         if not cursor.fetchone():
             return JSONResponse({
                 "success": False,
                 "error": "Highlight not found"
             }, status_code=404)
         
-        cursor.execute("DELETE FROM athlete_highlights WHERE id = ?", (highlight_id,))
+        cursor.execute("DELETE FROM highlights WHERE id = ?", (highlight_id,))
         conn.commit()
         
         return JSONResponse({
@@ -1994,7 +2034,7 @@ async def generate_highlights_enhanced(
             created_highlights = []
             for highlight_text in highlights[:3]:  # Limit to 3 highlights
                 cursor.execute("""
-                    INSERT INTO athlete_highlights (
+                    INSERT INTO highlights (
                         athlete_id, highlight_text, category, categories,
                         source_conversation_id, is_manual, is_active, source
                     ) VALUES (?, ?, ?, ?, ?, 0, 1, 'ai')
@@ -2057,13 +2097,13 @@ async def coach_todo_board(request: Request) -> HTMLResponse:
     """Serve the coach todo board page."""
     return templates.TemplateResponse("coach_todo_board.html", {"request": request})
 
-# Add migration for athlete_highlights table
+# Add migration for highlights table
 def migrate_athlete_highlights():
-    """Add missing columns to athlete_highlights if they don't exist"""
+    """Add missing columns to highlights if they don't exist"""
     cursor = conn.cursor()
     
     # Check if categories column exists
-    cursor.execute("PRAGMA table_info(athlete_highlights)")
+    cursor.execute("PRAGMA table_info(highlights)")
     columns = [column[1] for column in cursor.fetchall()]
     
     # Add missing columns
@@ -2097,8 +2137,8 @@ def migrate_athlete_highlights():
     for column_def in missing_columns:
         try:
             column_name = column_def.split()[0]
-            cursor.execute(f"ALTER TABLE athlete_highlights ADD COLUMN {column_def}")
-            logger.info(f"✅ Added {column_name} column to athlete_highlights table")
+            cursor.execute(f"ALTER TABLE highlights ADD COLUMN {column_def}")
+            logger.info(f"✅ Added {column_name} column to highlights table")
         except Exception as e:
             logger.error(f"Error adding {column_def}: {e}")
     
@@ -2441,7 +2481,7 @@ async def get_athlete_highlights_enhanced(
                 h.updated_at,
                 a.name as athlete_name,
                 h.source_conversation_id
-            FROM athlete_highlights h
+            FROM highlights h
             LEFT JOIN athletes a ON h.athlete_id = a.id
             WHERE h.athlete_id = ?
         """
@@ -2764,8 +2804,8 @@ async def get_athlete_risk_factors_gpt(athlete_id: int) -> dict:
             # Get recent conversations (last 30 days)
             cursor.execute("""
                 SELECT 
-                    r.transcription,
-                    r.final_response,
+                    m.transcription,
+                    m.final_response,
                     r.timestamp,
                     r.category,
                     r.source
@@ -2801,7 +2841,7 @@ async def get_athlete_risk_factors_gpt(athlete_id: int) -> dict:
                     h.highlight_text,
                     h.categories,
                     h.created_at
-                FROM athlete_highlights h
+                FROM highlights h
                 WHERE h.athlete_id = ?
                 AND h.is_active = 1
                 AND h.created_at >= datetime('now', '-14 days')
@@ -3074,8 +3114,8 @@ def get_athlete_risk_factors(athlete_id: int) -> dict:
             # Get recent conversations (last 30 days)
             cursor.execute("""
                 SELECT 
-                    r.transcription,
-                    r.final_response,
+                    m.transcription,
+                    m.final_response,
                     r.timestamp,
                     r.category,
                     r.source
@@ -3111,7 +3151,7 @@ def get_athlete_risk_factors(athlete_id: int) -> dict:
                     h.highlight_text,
                     h.categories,
                     h.created_at
-                FROM athlete_highlights h
+                FROM highlights h
                 WHERE h.athlete_id = ?
                 AND h.is_active = 1
                 AND h.created_at >= datetime('now', '-14 days')

@@ -44,14 +44,14 @@ class DatabaseConsolidator:
             'has_records': 'records' in tables,
             'has_messages': 'messages' in tables,
             'has_conversations': 'conversations' in tables,
-            'has_athlete_highlights': 'athlete_highlights' in tables,
+            'has_athlete_highlights': 'highlights' in tables,
             'has_highlights': 'highlights' in tables,
             'has_todos': 'todos' in tables,
             'all_tables': tables
         }
         
         # Count records in each table
-        for table in ['records', 'messages', 'athlete_highlights', 'highlights']:
+        for table in ['records', 'messages', 'highlights', 'highlights']:
             if table in tables:
                 cursor.execute(f"SELECT COUNT(*) FROM {table}")
                 schema_info[f'{table}_count'] = cursor.fetchone()[0]
@@ -279,19 +279,19 @@ class DatabaseConsolidator:
         return migrated_count
     
     def migrate_athlete_highlights_to_highlights(self):
-        """Migrate data from athlete_highlights to highlights table"""
+        """Migrate data from highlights to highlights table"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        logger.info("🔄 Migrating athlete_highlights to highlights...")
+        logger.info("🔄 Migrating highlights to highlights...")
         
-        # Check if athlete_highlights table exists
+        # Check if highlights table exists
         cursor.execute("""
             SELECT name FROM sqlite_master 
-            WHERE type='table' AND name='athlete_highlights'
+            WHERE type='table' AND name='highlights'
         """)
         if not cursor.fetchone():
-            logger.info("ℹ️  No athlete_highlights table found, skipping migration")
+            logger.info("ℹ️  No highlights table found, skipping migration")
             conn.close()
             return 0
         
@@ -299,7 +299,7 @@ class DatabaseConsolidator:
         cursor.execute("""
             SELECT id, athlete_id, highlight_text, category, 
                    source_conversation_id, created_at, updated_at, is_active
-            FROM athlete_highlights
+            FROM highlights
             ORDER BY created_at ASC
         """)
         highlights = cursor.fetchall()
@@ -374,7 +374,7 @@ class DatabaseConsolidator:
         logger.info("🗑️  Cleaning up old tables...")
         
         # Rename old tables instead of dropping (safer)
-        old_tables = ['records', 'athlete_highlights']
+        old_tables = ['records', 'highlights']
         
         for table in old_tables:
             try:

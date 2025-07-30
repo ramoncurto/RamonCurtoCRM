@@ -12,13 +12,13 @@ def check_database():
     for table in tables:
         print(f"  {table[0]}")
     
-    # Check athlete_highlights table if it exists
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='athlete_highlights'")
+    # Check highlights table if it exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='highlights'")
     if cursor.fetchone():
         print("\nathlete_highlights table exists")
-        cursor.execute("SELECT DISTINCT category FROM athlete_highlights")
+        cursor.execute("SELECT DISTINCT category FROM highlights")
         categories = cursor.fetchall()
-        print("Categories in athlete_highlights:")
+        print("Categories in highlights:")
         for cat in categories:
             print(f"  {cat[0]}")
     else:

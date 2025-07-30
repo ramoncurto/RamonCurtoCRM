@@ -240,6 +240,80 @@ def add_workflow_endpoints(app: FastAPI, db_path: str = 'database.db'):
             logger.error(f"Error creating todo: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     
+    @app.put("/messages/{message_id}")
+    async def update_message(message_id: int, request: dict):
+        """Update a message"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Check if message exists
+            cursor.execute("SELECT id FROM messages WHERE id = ?", (message_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Message not found")
+            
+            # Update message
+            update_fields = []
+            params = []
+            
+            if 'content_text' in request:
+                update_fields.append("content_text = ?")
+                params.append(request['content_text'])
+            
+            if 'transcription' in request:
+                update_fields.append("transcription = ?")
+                params.append(request['transcription'])
+            
+            if 'final_response' in request:
+                update_fields.append("final_response = ?")
+                params.append(request['final_response'])
+            
+            if not update_fields:
+                raise HTTPException(status_code=400, detail="No fields to update")
+            
+            update_fields.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(message_id)
+            
+            query = f"UPDATE messages SET {', '.join(update_fields)} WHERE id = ?"
+            cursor.execute(query, params)
+            conn.commit()
+            conn.close()
+            
+            return JSONResponse({
+                "status": "success",
+                "message": "Message updated successfully"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error updating message: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.delete("/messages/{message_id}")
+    async def delete_message(message_id: int):
+        """Delete a message"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            # Check if message exists
+            cursor.execute("SELECT id FROM messages WHERE id = ?", (message_id,))
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Message not found")
+            
+            # Delete message
+            cursor.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+            conn.commit()
+            conn.close()
+            
+            return JSONResponse({
+                "status": "success",
+                "message": "Message deleted successfully"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error deleting message: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
     @app.get("/athletes/{athlete_id}/todos")
     async def get_athlete_todos(athlete_id: int, status: Optional[str] = None):
         """Get todos for an athlete"""
