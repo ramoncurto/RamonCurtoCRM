@@ -36,6 +36,9 @@ function initWorkspace() {
   // Setup event listeners
   setupEventListeners();
   setupKeyboardShortcuts();
+  
+  // Verificar estado del sistema de transcripción al cargar
+  checkTranscriptionStatus();
 }
 
 /**
@@ -1926,3 +1929,496 @@ if (document.readyState === 'loading') {
 } else {
   initWorkspace();
 }
+
+// ===== MEJORAS PARA TRANSCRIPCIÓN DE AUDIO =====
+
+/**
+ * Manejar la transcripción de archivos de audio con mejor feedback de usuario
+ */
+async function handleTranscription() {
+    const fileInput = document.getElementById('audioInput');
+    const btnTranscribir = document.getElementById('btnTranscribir');
+    const dropLabel = document.getElementById('dropLabel');
+    
+    if (!fileInput.files.length) {
+        showToast('Por favor selecciona un archivo de audio', 'warning');
+        return;
+    }
+    
+    const file = fileInput.files[0];
+    
+    // Validaciones del lado del cliente
+    const validationResult = validateAudioFile(file);
+    if (!validationResult.valid) {
+        showToast(validationResult.message, 'error');
+        return;
+    }
+    
+    // Actualizar UI durante el procesamiento
+    const originalText = btnTranscribir.innerHTML;
+    const originalDisabled = btnTranscribir.disabled;
+    
+    btnTranscribir.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Transcribiendo...';
+    btnTranscribir.disabled = true;
+    dropLabel.textContent = `Procesando ${file.name} (${formatFileSize(file.size)})...`;
+    
+    try {
+        // Mostrar información del archivo
+        showFileInfo(file);
+        
+        // Crear FormData para el upload
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Realizar la transcripción
+        const response = await fetch('/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        // Manejar la respuesta
+        await handleTranscriptionResponse(result, file);
+        
+    } catch (error) {
+        console.error('Error en transcripción:', error);
+        handleTranscriptionError(error, file);
+    } finally {
+        // Restaurar UI
+        btnTranscribir.innerHTML = originalText;
+        btnTranscribir.disabled = originalDisabled;
+        dropLabel.textContent = 'Arrastra un audio o haz clic';
+        fileInput.value = ''; // Limpiar el input
+    }
+}
+
+/**
+ * Validar archivo de audio en el cliente
+ */
+function validateAudioFile(file) {
+    // Verificar que es un archivo
+    if (!file) {
+        return { valid: false, message: 'No se seleccionó ningún archivo' };
+    }
+    
+    // Verificar tamaño (25MB máximo)
+    const maxSize = 25 * 1024 * 1024; // 25MB
+    if (file.size > maxSize) {
+        return { 
+            valid: false, 
+            message: `Archivo demasiado grande (${formatFileSize(file.size)}). Máximo permitido: 25MB` 
+        };
+    }
+    
+    // Verificar que no esté vacío
+    if (file.size === 0) {
+        return { valid: false, message: 'El archivo está vacío' };
+    }
+    
+    // Verificar extensión (permitir más formatos)
+    const allowedExtensions = [
+        '.mp3', '.wav', '.m4a', '.mp4', '.mpeg', '.mpga', '.webm', // Directos
+        '.ogg', '.opus', '.oga', '.aac', '.flac' // Con conversión
+    ];
+    
+    const extension = getFileExtension(file.name);
+    if (!allowedExtensions.includes(extension)) {
+        return { 
+            valid: false, 
+            message: `Formato no soportado: ${extension}. Formatos permitidos: ${allowedExtensions.join(', ')}` 
+        };
+    }
+    
+    // Verificar tipo MIME si está disponible
+    if (file.type && !file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+        console.warn(`Tipo MIME inesperado: ${file.type}`);
+    }
+    
+    return { valid: true };
+}
+
+/**
+ * Mostrar información del archivo antes de procesarlo
+ */
+function showFileInfo(file) {
+    const extension = getFileExtension(file.name);
+    const fileSize = formatFileSize(file.size);
+    
+    // Determinar el tipo de procesamiento esperado
+    const directFormats = ['.mp3', '.wav', '.m4a', '.mp4', '.mpeg', '.mpga', '.webm'];
+    const conversionFormats = ['.ogg', '.opus', '.oga', '.aac', '.flac'];
+    
+    let processingInfo = '';
+    if (directFormats.includes(extension)) {
+        processingInfo = '🚀 Procesamiento directo (rápido)';
+    } else if (conversionFormats.includes(extension)) {
+        processingInfo = '🔄 Requiere conversión (puede tomar más tiempo)';
+    }
+    
+    showToast(`📁 ${file.name} (${fileSize}) - ${processingInfo}`, 'info', 3000);
+}
+
+/**
+ * Manejar la respuesta de transcripción
+ */
+async function handleTranscriptionResponse(result, originalFile) {
+    console.log('Respuesta de transcripción:', result);
+    
+    if (result.success) {
+        // Transcripción exitosa
+        const transcription = result.transcription;
+        const charCount = result.character_count || transcription.length;
+        
+        // Mostrar el resultado en el input
+        const inputMensaje = document.getElementById('inputMensaje');
+        if (inputMensaje) {
+            inputMensaje.value = transcription;
+            inputMensaje.focus();
+        }
+        
+        // Mostrar información de éxito
+        const fileInfo = result.file_info;
+        let successMessage = `✅ Transcripción exitosa: ${charCount} caracteres`;
+        
+        if (fileInfo && fileInfo.format) {
+            const processingMethod = fileInfo.format.processing_method;
+            if (processingMethod === 'conversion') {
+                successMessage += ' (convertido desde ' + fileInfo.format.extension + ')';
+            }
+        }
+        
+        showToast(successMessage, 'success', 4000);
+        
+        // Mostrar preview si es muy largo
+        if (result.preview && result.preview !== transcription) {
+            console.log('Preview de transcripción:', result.preview);
+        }
+        
+    } else {
+        // Error en transcripción
+        handleTranscriptionFailure(result, originalFile);
+    }
+}
+
+/**
+ * Manejar fallos en la transcripción
+ */
+function handleTranscriptionFailure(result, originalFile) {
+    console.error('Fallo en transcripción:', result);
+    
+    const errorMessage = result.transcription || result.error || 'Error desconocido';
+    const details = result.details;
+    
+    // Mostrar error principal
+    showToast(errorMessage, 'error', 8000);
+    
+    // Mostrar información adicional si está disponible
+    if (details && details !== errorMessage) {
+        console.error('Detalles del error:', details);
+    }
+    
+    // Proporcionar sugerencias basadas en el tipo de error
+    provideSuggestions(result, originalFile);
+}
+
+/**
+ * Proporcionar sugerencias basadas en el error
+ */
+function provideSuggestions(result, originalFile) {
+    const errorMessage = (result.transcription || result.error || '').toLowerCase();
+    const fileExtension = getFileExtension(originalFile.name);
+    
+    let suggestions = [];
+    
+    // Sugerencias específicas por tipo de error
+    if (errorMessage.includes('openai api no configurada')) {
+        suggestions.push('💡 Configura OPENAI_API_KEY en tu archivo .env');
+        suggestions.push('🔗 Obtén tu API key en: https://platform.openai.com/account/api-keys');
+    } else if (errorMessage.includes('ffmpeg')) {
+        suggestions.push('💡 Instala FFmpeg para soportar más formatos de audio');
+        suggestions.push('🔗 Descarga FFmpeg: https://ffmpeg.org/download.html');
+        suggestions.push('📱 Alternativamente, usa formatos .mp3 o .wav');
+    } else if (errorMessage.includes('quota') || errorMessage.includes('billing')) {
+        suggestions.push('💳 Verifica tu cuenta de facturación de OpenAI');
+        suggestions.push('🔗 Panel de facturación: https://platform.openai.com/account/billing');
+    } else if (errorMessage.includes('conexión') || errorMessage.includes('timeout')) {
+        suggestions.push('🌐 Verifica tu conexión a internet');
+        suggestions.push('🔄 Inténtalo de nuevo en unos momentos');
+    } else if (['.ogg', '.opus', '.oga'].includes(fileExtension)) {
+        suggestions.push('📱 Este formato es común en WhatsApp/Telegram');
+        suggestions.push('💡 Requiere FFmpeg para conversión');
+        suggestions.push('📁 Alternativa: convierte a .mp3 antes de subir');
+    }
+    
+    // Mostrar sugerencias si las hay
+    if (suggestions.length > 0) {
+        setTimeout(() => {
+            const suggestionText = suggestions.join('\n');
+            showDetailedError('Sugerencias para resolver el problema:', suggestionText);
+        }, 1000);
+    }
+}
+
+/**
+ * Manejar errores de red/excepción
+ */
+function handleTranscriptionError(error, originalFile) {
+    console.error('Error de transcripción:', error);
+    
+    let userMessage = '❌ Error procesando el archivo de audio';
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        userMessage = '❌ Error de conexión. Verifica que el servidor esté funcionando.';
+    } else if (error.name === 'AbortError') {
+        userMessage = '❌ La transcripción fue cancelada.';
+    } else if (error.message) {
+        userMessage = `❌ Error: ${error.message}`;
+    }
+    
+    showToast(userMessage, 'error', 6000);
+}
+
+/**
+ * Mostrar error detallado con más información
+ */
+function showDetailedError(title, details) {
+    // Crear modal o expandir información de error
+    const modal = document.createElement('div');
+    modal.className = 'error-details-modal';
+    modal.innerHTML = `
+        <div class="error-details-content">
+            <div class="error-details-header">
+                <h3>${title}</h3>
+                <button class="error-details-close">&times;</button>
+            </div>
+            <div class="error-details-body">
+                <pre>${details}</pre>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Cerrar modal
+    modal.querySelector('.error-details-close').onclick = () => {
+        document.body.removeChild(modal);
+    };
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    };
+}
+
+/**
+ * Verificar el estado del sistema de transcripción
+ */
+async function checkTranscriptionStatus() {
+    try {
+        const response = await fetch('/transcription/status');
+        const status = await response.json();
+        
+        console.log('Estado del sistema de transcripción:', status);
+        
+        if (status.status === 'success') {
+            const config = status.configuration;
+            
+            // Mostrar advertencias si la configuración no es óptima
+            if (!config.openai_configured) {
+                showToast('⚠️ OpenAI API no configurada. La transcripción no funcionará.', 'warning', 5000);
+            } else if (!config.ffmpeg_available) {
+                showToast('⚠️ FFmpeg no disponible. Solo formatos básicos soportados.', 'warning', 4000);
+            }
+            
+            // Mostrar recomendaciones si las hay
+            if (status.system_status.recommendations.length > 0) {
+                status.system_status.recommendations.forEach(rec => {
+                    if (rec.type === 'error') {
+                        console.error('Configuración:', rec.message, '-', rec.action);
+                    } else if (rec.type === 'warning') {
+                        console.warn('Configuración:', rec.message, '-', rec.action);
+                    }
+                });
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error verificando estado de transcripción:', error);
+    }
+}
+
+/**
+ * Funciones auxiliares
+ */
+function getFileExtension(filename) {
+    return filename.toLowerCase().substring(filename.lastIndexOf('.'));
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Función mejorada para mostrar toast (compatible con API.toast existente)
+ */
+function showToast(message, type = 'info', duration = 3000) {
+    // Usar la función API.toast existente si está disponible
+    if (typeof API !== 'undefined' && API.toast) {
+        API.toast(type === 'error' ? 'Error' : type === 'success' ? 'Éxito' : 'Info', message, type);
+    } else {
+        // Fallback simple si API.toast no está disponible
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+}
+
+/**
+ * Mejorar el dropzone con información de formatos
+ */
+function setupEnhancedDropzone() {
+    const dropzone = document.getElementById('dropzone');
+    const dropLabel = document.getElementById('dropLabel');
+    
+    if (dropzone && dropLabel) {
+        // Actualizar texto con información de formatos
+        dropLabel.innerHTML = `
+            <i class="fa-solid fa-microphone-lines"></i>
+            Arrastra audio o haz clic<br>
+            <small style="font-size: 11px; opacity: 0.7;">
+                Soporta: WhatsApp (.ogg), Telegram (.m4a), MP3, WAV
+            </small>
+        `;
+        
+        // Mejorar feedback visual del drag & drop
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('drag-over');
+        });
+        
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('drag-over');
+        });
+        
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const audioInput = document.getElementById('audioInput');
+                audioInput.files = files;
+                
+                // Trigger transcription automatically after drop
+                setTimeout(() => {
+                    handleTranscription();
+                }, 100);
+            }
+        });
+    }
+}
+
+// CSS adicional para modales de error
+const errorModalCSS = `
+.error-details-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.error-details-content {
+    background: var(--bg-2);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.error-details-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.error-details-header h3 {
+    margin: 0;
+    color: var(--text-1);
+}
+
+.error-details-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-3);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.error-details-close:hover {
+    background: var(--bg-4);
+    color: var(--text-1);
+}
+
+.error-details-body pre {
+    background: var(--bg-4);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--text-2);
+    margin: 0;
+}
+
+.drag-over {
+    border-color: var(--primary) !important;
+    background: rgba(99, 102, 241, 0.1) !important;
+}
+`;
+
+// Agregar CSS si no existe
+if (!document.getElementById('error-modal-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'error-modal-styles';
+    styleElement.textContent = errorModalCSS;
+    document.head.appendChild(styleElement);
+}
+
+// Mejorar el setup de event listeners para incluir las nuevas funciones
+const originalSetupEventListeners = setupEventListeners;
+setupEventListeners = function() {
+    // Llamar a la función original
+    originalSetupEventListeners();
+    
+    // Configurar dropzone mejorado
+    setupEnhancedDropzone();
+    
+    // Reemplazar la función de transcripción existente
+    const transcribeBtn = document.getElementById('btnTranscribir');
+    if (transcribeBtn) {
+        transcribeBtn.removeEventListener('click', transcribeAudio);
+        transcribeBtn.addEventListener('click', handleTranscription);
+    }
+};

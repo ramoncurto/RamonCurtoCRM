@@ -7,6 +7,7 @@ from typing import Optional
 import re
 import json
 import math
+from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -286,68 +287,203 @@ async def index(request: Request) -> HTMLResponse:
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)) -> JSONResponse:
     """
-    Receive an audio file, save it locally and return a placeholder transcript.
+    Recibir un archivo de audio, guardarlo localmente y transcribirlo.
+    Versión mejorada con mejor manejo de errores y soporte para más formatos.
 
     Parameters
     ----------
     file : UploadFile
-        The uploaded audio file (e.g. .ogg, .m4a) from WhatsApp/Telegram.
+        El archivo de audio subido (e.g. .ogg, .opus, .m4a, .mp3, .wav) 
+        desde WhatsApp/Telegram/manual.
 
     Returns
     -------
     JSONResponse
-        JSON containing the generated (placeholder) transcription and stored
-        filename.
+        JSON con la transcripción y información del archivo, o errores detallados.
     """
-    # Read the uploaded file contents
-    contents = await file.read()
+    # Verificar que el servicio de transcripción esté configurado
+    if not transcription_service.client:
+        return JSONResponse({
+            "success": False,
+            "error": "OpenAI API no configurada",
+            "details": "Por favor configura OPENAI_API_KEY en tu archivo .env",
+            "transcription": "❌ Error: OpenAI API no configurada. Configura OPENAI_API_KEY en .env",
+            "filename": None
+        }, status_code=500)
     
-    # Create a unique filename using timestamp to avoid collisions
+    # Validar el archivo
+    if not file or not file.filename:
+        return JSONResponse({
+            "success": False,
+            "error": "No se proporcionó archivo",
+            "transcription": "❌ Error: No se proporcionó ningún archivo de audio",
+            "filename": None
+        }, status_code=400)
+    
+    # Verificar contenido del archivo
+    try:
+        contents = await file.read()
+        if not contents:
+            return JSONResponse({
+                "success": False,
+                "error": "Archivo vacío",
+                "transcription": "❌ Error: El archivo está vacío",
+                "filename": None
+            }, status_code=400)
+    except Exception as e:
+        return JSONResponse({
+            "success": False,
+            "error": "Error leyendo archivo",
+            "details": str(e),
+            "transcription": f"❌ Error: No se pudo leer el archivo - {str(e)}",
+            "filename": None
+        }, status_code=400)
+    
+    # Obtener información del archivo
+    file_extension = Path(file.filename).suffix.lower()
+    file_size = len(contents)
+    
+    logger.info(f"📁 Archivo recibido: {file.filename} ({file_extension}, {file_size:,} bytes)")
+    
+    # Verificar tamaño del archivo
+    if file_size > 25 * 1024 * 1024:  # 25MB limit
+        return JSONResponse({
+            "success": False,
+            "error": "Archivo demasiado grande",
+            "details": f"Tamaño: {file_size:,} bytes (máximo: 25MB)",
+            "transcription": "❌ Error: El archivo es demasiado grande (>25MB). Por favor usa un archivo más pequeño.",
+            "filename": None
+        }, status_code=400)
+    
+    # Crear nombre de archivo único
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-    safe_name = re.sub(r'[^\w\-_\.]', '_', file.filename)  # Sanitize filename
+    safe_name = re.sub(r'[^\w\-_\.]', '_', file.filename)
     filename = f"{timestamp}_{safe_name}"
     
-    # Use absolute path for uploads directory
+    # Usar ruta absoluta para el directorio uploads
     uploads_dir = os.path.abspath('uploads')
     file_path = os.path.join(uploads_dir, filename)
     
-    # Ensure uploads directory exists
+    # Asegurar que el directorio uploads existe
     os.makedirs(uploads_dir, exist_ok=True)
     
-    # Save the file to disk
     try:
-        logger.info(f"Saving file to: {file_path}")
+        # Guardar el archivo en disco
+        logger.info(f"💾 Guardando archivo en: {file_path}")
         with open(file_path, 'wb') as out_file:
             out_file.write(contents)
         
-        # Verify file was created and is not empty
+        # Verificar que el archivo se guardó correctamente
         if not os.path.exists(file_path):
-            raise FileNotFoundError(f"File not created: {file_path}")
+            raise FileNotFoundError(f"El archivo no se creó: {file_path}")
         
-        file_size = os.path.getsize(file_path)
-        if file_size == 0:
-            raise ValueError("File is empty")
+        saved_size = os.path.getsize(file_path)
+        if saved_size != file_size:
+            raise ValueError(f"Tamaño incorrecto: esperado {file_size}, guardado {saved_size}")
             
-        logger.info(f"File saved successfully: {file_path} ({file_size} bytes)")
+        logger.info(f"✅ Archivo guardado exitosamente: {file_path} ({saved_size:,} bytes)")
         
-        # Use OpenAI Whisper API for actual transcription
+        # Obtener información de formatos soportados
+        format_info = transcription_service.get_supported_formats()
+        
+        # Determinar si el formato está soportado
+        is_direct_format = file_extension in format_info['direct_formats']
+        is_conversion_format = file_extension in format_info['conversion_formats']
+        
+        # Preparar información del formato para el usuario
+        format_status = {
+            "extension": file_extension,
+            "is_direct_format": is_direct_format,
+            "is_conversion_format": is_conversion_format,
+            "ffmpeg_available": format_info['ffmpeg_available'],
+            "processing_method": None
+        }
+        
+        if is_direct_format:
+            format_status["processing_method"] = "direct"
+        elif is_conversion_format and format_info['ffmpeg_available']:
+            format_status["processing_method"] = "conversion"
+        elif is_conversion_format and not format_info['ffmpeg_available']:
+            format_status["processing_method"] = "unsupported_no_ffmpeg"
+        else:
+            format_status["processing_method"] = "unsupported"
+        
+        # Transcribir usando el servicio mejorado
+        logger.info(f"🎤 Iniciando transcripción...")
         transcription = await transcription_service.transcribe_audio(file_path)
         
-        if transcription is None:
-            transcription = (
-                f"[Error transcribing {file.filename}. Please check the audio format]"
-            )
+        # Preparar respuesta
+        response_data = {
+            "success": True,
+            "transcription": transcription,
+            "filename": filename,
+            "file_info": {
+                "original_name": file.filename,
+                "size_bytes": file_size,
+                "size_mb": round(file_size / (1024 * 1024), 2),
+                "format": format_status
+            },
+            "system_info": {
+                "openai_configured": format_info['openai_configured'],
+                "ffmpeg_available": format_info['ffmpeg_available']
+            }
+        }
         
-        return JSONResponse({"transcription": transcription, "filename": filename})
+        # Verificar si la transcripción fue exitosa
+        if transcription and not transcription.startswith('❌'):
+            logger.info(f"✅ Transcripción exitosa: {len(transcription)} caracteres")
+            response_data["success"] = True
+            response_data["character_count"] = len(transcription)
+            
+            # Agregar preview de la transcripción
+            if len(transcription) > 100:
+                response_data["preview"] = transcription[:100] + "..."
+            else:
+                response_data["preview"] = transcription
+                
+        else:
+            logger.error(f"❌ Error en transcripción: {transcription}")
+            response_data["success"] = False
+            response_data["error"] = "Transcripción falló"
+            response_data["details"] = transcription
+        
+        return JSONResponse(response_data)
         
     except Exception as e:
-        logger.error(f"Transcription error: {str(e)}")
-        # Clean up file if it exists
+        # Limpiar archivo si existe
         if os.path.exists(file_path):
-            os.remove(file_path)
+            try:
+                os.remove(file_path)
+                logger.info(f"🗑️  Archivo limpiado después del error: {file_path}")
+            except:
+                pass
+        
+        error_msg = str(e)
+        logger.error(f"❌ Error en transcripción: {error_msg}")
+        
+        # Proporcionar mensajes de error específicos
+        if "Connection" in error_msg or "timeout" in error_msg.lower():
+            user_error = "❌ Error de conexión. Verifica tu conexión a internet e inténtalo de nuevo."
+        elif "api key" in error_msg.lower() or "authentication" in error_msg.lower():
+            user_error = "❌ Error de autenticación OpenAI. Verifica tu OPENAI_API_KEY."
+        elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
+            user_error = "❌ Cuota de OpenAI excedida. Verifica tu cuenta de facturación."
+        elif "FFmpeg" in error_msg or "conversion" in error_msg.lower():
+            user_error = f"❌ Error de conversión de audio. {error_msg}"
+        else:
+            user_error = f"❌ Error procesando audio: {error_msg}"
+        
         return JSONResponse({
-            "transcription": f"[Error: {str(e)}]",
-            "filename": None
+            "success": False,
+            "error": "Error procesando archivo",
+            "details": error_msg,
+            "transcription": user_error,
+            "filename": filename,
+            "file_info": {
+                "original_name": file.filename,
+                "size_bytes": file_size,
+                "format": file_extension
+            }
         }, status_code=500)
 
 
@@ -3046,6 +3182,90 @@ async def generate_outreach_for_athlete(athlete_id: int, body: dict = {}) -> JSO
     except Exception as e:
         logger.error(f"Error generating outreach for athlete {athlete_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ===== ENDPOINTS DE TRANSCRIPCIÓN MEJORADOS =====
+
+@app.get("/transcription/status")
+async def transcription_status() -> JSONResponse:
+    """
+    Obtener el estado del sistema de transcripción.
+    Útil para diagnóstico y verificación de configuración.
+    """
+    try:
+        status = transcription_service.get_system_status()
+        format_info = transcription_service.get_supported_formats()
+        
+        return JSONResponse({
+            "status": "success",
+            "system_status": status,
+            "supported_formats": {
+                "direct_formats": format_info['direct_formats'],
+                "conversion_formats": format_info['conversion_formats']
+            },
+            "configuration": {
+                "openai_configured": format_info['openai_configured'],
+                "ffmpeg_available": format_info['ffmpeg_available']
+            },
+            "recommendations": status['recommendations']
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "status": "error",
+            "error": str(e)
+        }, status_code=500)
+
+
+@app.get("/transcription/formats")
+async def supported_formats() -> JSONResponse:
+    """
+    Obtener información detallada sobre formatos de audio soportados.
+    """
+    try:
+        format_info = transcription_service.get_supported_formats()
+        
+        # Información detallada sobre cada formato
+        format_details = {
+            "whatsapp_formats": {
+                "common": [".ogg", ".opus"],
+                "description": "WhatsApp usa principalmente OGG con codec OPUS",
+                "requires_ffmpeg": True
+            },
+            "telegram_formats": {
+                "common": [".ogg", ".m4a", ".oga"],
+                "description": "Telegram usa OGG, M4A y otros formatos",
+                "requires_ffmpeg": True
+            },
+            "direct_formats": {
+                "formats": format_info['direct_formats'],
+                "description": "Formatos soportados directamente por OpenAI Whisper",
+                "requires_ffmpeg": False
+            },
+            "conversion_formats": {
+                "formats": format_info['conversion_formats'],
+                "description": "Formatos que requieren conversión con FFmpeg",
+                "requires_ffmpeg": True,
+                "available": format_info['ffmpeg_available']
+            }
+        }
+        
+        return JSONResponse({
+            "status": "success",
+            "format_details": format_details,
+            "system_capabilities": {
+                "openai_whisper": format_info['openai_configured'],
+                "ffmpeg_conversion": format_info['ffmpeg_available'],
+                "full_support": format_info['openai_configured'] and format_info['ffmpeg_available']
+            }
+        })
+        
+    except Exception as e:
+        return JSONResponse({
+            "status": "error",
+            "error": str(e)
+        }, status_code=500)
+
 
 if __name__ == "__main__":
     import uvicorn
